@@ -67,6 +67,7 @@ def b_spline_basis(t, k, i=None, knots_num=None):
     # k: degree
     # i: how many basis
     # knots: knots
+    # test change to create branch
 
     if knots_num is None:
         knots = [0.]*k + list(np.linspace(0, 1, k)) + [1.]*k
