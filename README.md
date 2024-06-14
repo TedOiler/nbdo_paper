@@ -12,6 +12,7 @@
 To install the required dependencies, run:
 ```bash
 pip install -r requirements.txt
+```
 
 ## Usage
 Examples and usage instructions can be found in the `playground` directory.
