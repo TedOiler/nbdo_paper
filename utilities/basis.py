@@ -63,19 +63,7 @@ def fourier(t, p):
         return np.sin((p - 1) * np.pi * t)
 
 
-def b_spline_basis(t, k, i=None, knots_num=None):
-    # k: degree
-    # i: how many basis
-    # knots: knots
-    # test change to create branch
-
-    if knots_num is None:
-        knots = [0.]*k + list(np.linspace(0, 1, k)) + [1.]*k
-    else:
-        knots = [0.]*k + list(np.linspace(0, 1, knots_num)) + [1.]*k
-    if i is None:
-        i = knots_num - k - 1
-
+def b_spline_basis(t, k, i, knots):
     if k == 0:
         return lambda t: 1.0 if knots[i] <= t < knots[i + 1] else 0.0
     else:
@@ -89,9 +77,9 @@ def b_spline_basis(t, k, i=None, knots_num=None):
             if knots[i + k + 1] == knots[i + 1]:
                 return 0.0
             else:
-                return ((knots[i + k + 1] - t) / (knots[i + k + 1] - knots[i + 1])) * b_spline_basis(t, k - 1, i + 1,
-                                                                                                     knots)(t)
+                return ((knots[i + k + 1] - t) / (knots[i + k + 1] - knots[i + 1])) * b_spline_basis(t, k - 1, i + 1, knots)(t)
 
         return lambda t: left_term(t) + right_term(t)
+
 
 #%%
