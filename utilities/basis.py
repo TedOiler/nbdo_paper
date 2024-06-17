@@ -41,16 +41,6 @@ def step(t, w):
 
 
 def polynomial(t, p=0):
-    """
-    Calculates the value of the polynomial t^p at the given value of t.
-
-    Args:
-        t (float): The input value for the polynomial.
-        p (int): The power to which t is raised. Default is 0.
-
-    Returns:
-        float: The value of the polynomial t^p evaluated at t.
-    """
     return t ** p
 
 
@@ -65,21 +55,14 @@ def fourier(t, p):
 
 def b_spline_basis(t, k, i, knots):
     if k == 0:
-        return lambda t: 1.0 if knots[i] <= t < knots[i + 1] else 0.0
+        return 1.0 if knots[i] <= t < knots[i + 1] else 0.0
     else:
-        def left_term(t):
-            if knots[i + k] == knots[i]:
-                return 0.0
-            else:
-                return ((t - knots[i]) / (knots[i + k] - knots[i])) * b_spline_basis(t, k - 1, i, knots)(t)
+        left_term = 0.0
+        if knots[i + k] != knots[i]:
+            left_term = ((t - knots[i]) / (knots[i + k] - knots[i])) * b_spline_basis(t, k - 1, i, knots)
 
-        def right_term(t):
-            if knots[i + k + 1] == knots[i + 1]:
-                return 0.0
-            else:
-                return ((knots[i + k + 1] - t) / (knots[i + k + 1] - knots[i + 1])) * b_spline_basis(t, k - 1, i + 1, knots)(t)
+        right_term = 0.0
+        if knots[i + k + 1] != knots[i + 1]:
+            right_term = ((knots[i + k + 1] - t) / (knots[i + k + 1] - knots[i + 1])) * b_spline_basis(t, k - 1, i + 1, knots)
 
-        return lambda t: left_term(t) + right_term(t)
-
-
-#%%
+        return left_term + right_term
