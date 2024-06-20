@@ -1,7 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-from .basis import step
+from .basis import step, b_spline_basis
 
 
 # plt.style.use('default')
@@ -40,6 +40,24 @@ def plot_basis(ax, T, w, f, run, size=35) -> None:
     ax.scatter([0, 1], [w[0], w[len(w) - 1]], edgecolor="black", facecolors='black', s=size, zorder=1)  # support knots with empty circles
     ax.locator_params(axis='y', nbins=3)
     ax.locator_params(axis='x', nbins=6)
+
+
+def plot_b_spline_basis(k, knots, knots_num):
+    t_vals = np.linspace(0, 1, 10_000)
+    plt.figure(figsize=(10, 6))
+
+    for i in range(knots_num - 1):
+        b_spline_vals = [b_spline_basis(t, k, i, knots) for t in t_vals]
+        plt.plot(t_vals, b_spline_vals)
+
+    internal_knots = np.linspace(0, 1, knots_num - k)
+    plt.plot(internal_knots, [0]*len(internal_knots), 'bo')
+
+    plt.title('B-spline Basis Functions')
+    plt.xlabel('$t$')
+    plt.ylabel('Basis function value')
+    plt.grid(True)
+    plt.show()
 
 
 def subplot_results(sub_x, sub_y, T, results, style='fivethirtyeight', size=35, save=True, show=True) -> None:

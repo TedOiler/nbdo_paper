@@ -30,8 +30,8 @@ class CordexContinuous(BaseOptimizer):
         for _ in tqdm(range(epochs)):
             Gamma_, X_ = gen_rand_design_m(runs=runs, f_list=nx, scalars=scalars)
             model_matrix = Gamma_
-            for i in range(model_matrix.shape[0]): # Kx
-                for j in range(model_matrix.shape[1]): # Kb
+            for i in range(model_matrix.shape[0]):  # Kx
+                for j in range(model_matrix.shape[1]):  # Kb
                     result = minimize(objective, model_matrix[i, j], method='L-BFGS-B', bounds=[(-1, 1)])
                     if result.x is not None:
                         model_matrix[i, j] = result.x

@@ -1,4 +1,4 @@
-from .Jcb import Jcb, calc_basis_matrix
+from .J_step_poly import Jcb, calc_basis_matrix
 from scipy.linalg import block_diag
 
 
