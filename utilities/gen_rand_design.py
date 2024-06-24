@@ -18,14 +18,5 @@ def gen_rand_design(runs: int, feats: int, num_x, num_f, low: int = -1, high: in
     return A
 
 
-def gen_rand_design_m(runs, f_list=None, scalars=None, low=-1, high=1):
-    if f_list is None:
-        F = None
-    else:
-        F = np.random.uniform(low=low, high=high, size=(runs, sum(f_list)))
-    if scalars is None:
-        S = None
-    else:
-        S = np.random.uniform(low=low, high=high, size=(runs, scalars))
-
-    return F, S
+def gen_rand_design_m(runs, f_list, low=-1, high=1):
+    return np.random.uniform(low=low, high=high, size=(runs, sum(f_list)))

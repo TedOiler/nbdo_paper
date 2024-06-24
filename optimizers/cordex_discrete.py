@@ -18,28 +18,28 @@ class CordexDiscrete(BaseOptimizer):
         super().__init__(model)
         self.model = model
 
-    def optimize(self, runs, nx, scalars=0, epochs=1000, final_pass_iter=100, levels=None):
+    def optimize(self, runs, nx, epochs=1000, final_pass_iter=100, levels=None):
         best_design, best_optimality_value = None, np.inf
 
         for _ in tqdm(range(epochs)):
-            Gamma, _ = gen_rand_design_m(runs=runs, f_list=nx, scalars=scalars)
+            Gamma = gen_rand_design_m(runs=runs, f_list=nx)
             best_design, best_optimality_value = self._cordex_loop(
-                Gamma, runs, nx, scalars, best_optimality_value, best_design, levels)
+                Gamma, runs, nx, best_optimality_value, best_design, levels)
 
         if final_pass_iter > 0:
             for _ in tqdm(range(final_pass_iter)):
                 best_design, best_optimality_value = self._cordex_loop(
-                    best_design, runs, nx, scalars, best_optimality_value, best_design, levels
+                    best_design, runs, nx, best_optimality_value, best_design, levels
                 )
 
         return best_design, np.abs(best_optimality_value)
 
-    def _cordex_loop(self, model_matrix, runs, nx, scalars, best_optimality_value, best_design, levels):
+    def _cordex_loop(self, model_matrix, runs, nx, best_optimality_value, best_design, levels):
         current_optimality_value = best_optimality_value
 
         for i in range(model_matrix.shape[0]):
             for j in range(model_matrix.shape[1]):
-                objective = self._get_objective_function(i, j, model_matrix, runs, nx, scalars)
+                objective = self._get_objective_function(i, j, model_matrix, runs, nx)
                 best_level, best_obj_value = self._evaluate_objective_levels(
                     objective, model_matrix[i, j], levels)
 
@@ -52,11 +52,11 @@ class CordexDiscrete(BaseOptimizer):
 
         return best_design, best_optimality_value
 
-    def _get_objective_function(self, i, j, model_matrix, runs, nx, scalars):
+    def _get_objective_function(self, i, j, model_matrix, runs, nx):
         if isinstance(self.model, FunctionOnFunctionModel):
             return lambda x: self.model.compute_objective_input(x, i, j, model_matrix, runs, nx)
         elif isinstance(self.model, ScalarOnFunctionModel):
-            return lambda x: self.model.compute_objective_input(x, i, j, model_matrix, sum(nx) + scalars)
+            return lambda x: self.model.compute_objective_input(x, i, j, model_matrix, sum(nx))
         else:
             raise TypeError("Unsupported model type")
 
