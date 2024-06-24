@@ -41,11 +41,7 @@ class CordexContinuous(BaseOptimizer):
 
         for i in range(model_matrix.shape[0]):
             for j in range(model_matrix.shape[1]):
-                if isinstance(self.model, FunctionOnFunctionModel):
-                    objective = lambda x: self.model.compute_objective_input(x, i, j, model_matrix, runs, nx)
-                elif isinstance(self.model, ScalarOnFunctionModel):
-                    objective = lambda x: self.model.compute_objective_input(x, i, j, model_matrix, sum(nx) + scalars)
-
+                objective = self._get_objective_function(i, j, model_matrix, runs, nx, scalars)
                 result = minimize(objective, model_matrix[i, j], method='L-BFGS-B', bounds=[(-1, 1)])
                 if result.x is not None:
                     model_matrix[i, j] = result.x
@@ -56,3 +52,11 @@ class CordexContinuous(BaseOptimizer):
             best_design = model_matrix.copy()
 
         return best_design, best_optimality_value
+
+    def _get_objective_function(self, i, j, model_matrix, runs, nx, scalars):
+        if isinstance(self.model, FunctionOnFunctionModel):
+            return lambda x: self.model.compute_objective_input(x, i, j, model_matrix, runs, nx)
+        elif isinstance(self.model, ScalarOnFunctionModel):
+            return lambda x: self.model.compute_objective_input(x, i, j, model_matrix, sum(nx) + scalars)
+        else:
+            raise TypeError("Unsupported model type")
