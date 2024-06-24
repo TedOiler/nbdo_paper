@@ -62,7 +62,7 @@ class NBDO(BaseOptimizer):
 
     def optimize(self, autoencoder, encoder, decoder, train_data, val_data, epochs=1_000,
                  batch_size=32, patience=50, optimizer=RMSprop, loss=tf.keras.losses.Huber(), monitor='val_loss',
-                 alpha=1., m=None, n=None, J_cb=None, noise=0, optimizer_kwargs=None,SEED=42):
+                 alpha=1., m=None, n=None, J_cb=None, noise=0, optimizer_kwargs=None, SEED=42):
 
         def objective_function_tf(X, m, n, J_cb=None, noise=0):
             batch_size = tf.shape(X)[0]
