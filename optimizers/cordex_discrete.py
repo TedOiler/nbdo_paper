@@ -7,7 +7,6 @@ from mathematical_models.f_on_f import FunctionOnFunctionModel
 from mathematical_models.s_on_f import ScalarOnFunctionModel
 from tqdm import tqdm
 
-# Setting up the directory paths
 current_dir = Path(__file__).parent.resolve()
 parent_dir = current_dir.parent
 sys.path.append(str(parent_dir))
