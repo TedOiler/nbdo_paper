@@ -15,21 +15,22 @@ sys.path.append(str(parent_dir))
 
 
 class CordexContinuous(BaseOptimizer):
-    def __init__(self, model):
+    def __init__(self, model, runs):
         super().__init__(model)
         self.model = model
+        self.runs = runs
 
-    def optimize(self, runs, nx, epochs=1000, final_pass_iter=100):
+    def optimize(self, epochs=1000, refinement_epochs=100):
         best_design, best_optimality_value = None, np.inf
 
         for _ in tqdm(range(epochs)):
-            Gamma = gen_rand_design_m(runs=runs, f_list=nx)
-            best_design, best_optimality_value = self._cordex_loop(Gamma, runs, nx,
+            Gamma = gen_rand_design_m(runs=self.runs, f_list=self.model.Kx)
+            best_design, best_optimality_value = self._cordex_loop(Gamma, self.runs, self.model.Kx,
                                                                    best_optimality_value, best_design)
 
-        if final_pass_iter > 0:
-            for _ in tqdm(range(final_pass_iter)):
-                best_design, best_optimality_value = self._cordex_loop(best_design, runs, nx,
+        if refinement_epochs > 0:
+            for _ in tqdm(range(refinement_epochs)):
+                best_design, best_optimality_value = self._cordex_loop(best_design, self.runs, self.model.Kx,
                                                                        best_optimality_value, best_design)
 
         return best_design, np.abs(best_optimality_value)
