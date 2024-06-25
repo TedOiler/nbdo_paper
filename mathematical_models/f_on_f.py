@@ -1,13 +1,24 @@
 from .base_model import BaseModel
 import numpy as np
+import os
+import sys
 
 
 class FunctionOnFunctionModel(BaseModel):
-    def __init__(self, I_theta, I_N, J_CH, Sigma):
-        self.I_theta = I_theta  # Identity matrix scaled by the size of Ky
-        self.I_N = I_N  # Identity matrix scaled by the size of N
-        self.J_CH = J_CH  # Integral of basis matrix from calc_J_CH
-        self.Sigma = Sigma  # Error structure matrix from calc_Sigma
+    def __init__(self, I_theta, I_N, J_CH, Sigma,
+                 Kx, Kb, Kx_family, Kb_family='polynomial', k_degree=None, knots_num=None, ):
+        self.Kx_family = Kx_family
+        self.Kx = Kx
+        self.Kb_family = Kb_family
+        self.Kb = Kb
+        self.k_degree = k_degree
+        self.knots_num = self.Kx[0] + 1
+        self.I_theta = I_theta
+        self.I_N = I_N
+        self.J_CH = J_CH
+        self.Sigma = Sigma
+
+        self.J_cb = self.compute_Jcb()
 
     def compute_objective(self, Gamma_, N, Kx):
         Gamma = np.hstack((np.ones((N, 1)), Gamma_))
@@ -42,3 +53,12 @@ class FunctionOnFunctionModel(BaseModel):
 
         # In practice, you might want to ensure 'value' is valid (e.g., not NaN or Inf) before returning
         return np.exp(np.log(objective_new) - np.log(objective_old)) if np.isfinite(objective_new) else np.nan
+
+    def compute_Jcb(self):
+        if self.Kx_family == 'step':
+            sys.path.append(os.path.abspath("../utilities"))
+            from utilities.J.matrix_calc import Jcb, calc_basis_matrix
+            return Jcb(*[calc_basis_matrix(x_basis=x, b_basis=b) for x, b in zip(self.Kx, self.Kb)])
+
+    def get_Jcb(self):
+        return self.J_cb
