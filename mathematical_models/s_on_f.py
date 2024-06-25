@@ -11,7 +11,7 @@ class ScalarOnFunctionModel(BaseModel):
         self.Kb_family = Kb_family
         self.Kb = Kb
         self.k_degree = k_degree
-        self.knots_num = knots_num
+        self.knots_num = self.Kx[0] + 1
 
         self.J_cb = self.compute_Jcb()
 
