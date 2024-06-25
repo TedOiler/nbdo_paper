@@ -3,7 +3,7 @@ from scipy.optimize import minimize
 import numpy as np
 import sys
 from pathlib import Path
-from utilities.gen_rand_design import gen_rand_design_m
+from utilities.help.gen_rand_design import gen_rand_design_m
 from mathematical_models.f_on_f import FunctionOnFunctionModel
 from mathematical_models.s_on_f import ScalarOnFunctionModel
 from tqdm import tqdm

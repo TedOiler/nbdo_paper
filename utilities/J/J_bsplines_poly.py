@@ -2,7 +2,7 @@ import numpy as np
 from scipy.integrate import quad
 from scipy.linalg import block_diag
 
-from .basis import b_spline_basis, polynomial
+from utilities.basis.basis import b_spline_basis, polynomial
 
 
 def elements(n, p, l1=0, k=3, knots_num=None) -> float:

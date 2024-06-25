@@ -109,7 +109,7 @@ system_optidex/
 │   └── __init__.py
 │
 ├── utilities/                 # Utility functions
-│   ├── optimalities.py
+│   ├── criteria.py
 │   ├── basis.py
 │   ├── J_bsplines_poly.py
 │   ├── calc_I_theta.py

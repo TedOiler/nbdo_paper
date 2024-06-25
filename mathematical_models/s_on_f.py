@@ -37,11 +37,11 @@ class ScalarOnFunctionModel(BaseModel):
     def compute_Jcb(self):
         if self.Kx_family == 'step':
             sys.path.append(os.path.abspath("../utilities"))
-            from utilities.matrix_calc import Jcb, calc_basis_matrix
+            from utilities.J.matrix_calc import Jcb, calc_basis_matrix
             return Jcb(*[calc_basis_matrix(x_basis=x, b_basis=b) for x, b in zip(self.Kx, self.Kb)])
         if self.Kx_family == 'b-spline':
             sys.path.append(os.path.abspath("../../utilities"))
-            from utilities.J_bsplines_poly import Jcb, calc_basis_matrix
+            from utilities.J.J_bsplines_poly import Jcb, calc_basis_matrix
             return Jcb(*[calc_basis_matrix(x_basis=x, b_basis=b, k=self.k_degree, knots_num=self.knots_num)
                          for x, b in zip(self.Kx, self.Kb)])
 
