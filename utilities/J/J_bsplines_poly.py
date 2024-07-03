@@ -7,9 +7,10 @@ from utilities.basis.basis import b_spline_basis, polynomial
 
 def elements(n, p, l1=0, k=3, knots_num=None) -> float:
     if knots_num is None:
-        knots = [0.] * k + list(np.linspace(0, 1, k + 1)) + [1.] * k
+        knots = [0.] * (k+1) + list(np.linspace(0, 1, knots_num - k + 1)) + [1.] * (k+1)
     else:
-        knots = [0.] * k + list(np.linspace(0, 1, knots_num - k)) + [1.] * k
+        knots = [0.] * (k+1) + list(np.linspace(0, 1, knots_num - k + 1)) + [1.] * (k+1)
+        # knots = list(np.linspace(0, 1, knots_num - k + 1))
 
     b_spline = lambda t: b_spline_basis(t, k, l1, knots)
     return quad(lambda t: b_spline(t) * polynomial(t, p=p), 0, 1, full_output=True)[0]
