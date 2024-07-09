@@ -1,12 +1,10 @@
 from .base_model import BaseModel
 import numpy as np
-import os
-import sys
 
 
 class ScalarOnScalar(BaseModel):
-    def __init__(self):
-        pass
+    def __init__(self, Kx):
+        self.Kx = Kx
 
     def compute_objective(self, Model_mat):
         ones = np.ones((Model_mat.shape[0], 1))
@@ -24,4 +22,3 @@ class ScalarOnScalar(BaseModel):
     def compute_objective_input(self, x, i, j, Model_mat):
         Model_mat[i, j] = x
         return self.compute_objective(Model_mat)
-

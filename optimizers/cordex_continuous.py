@@ -6,6 +6,7 @@ from pathlib import Path
 from utilities.help.gen_rand_design import gen_rand_design_m
 from mathematical_models.f_on_f import FunctionOnFunctionModel
 from mathematical_models.s_on_f import ScalarOnFunctionModel
+from mathematical_models.s_on_s import ScalarOnScalar
 from tqdm import tqdm
 
 current_dir = Path(__file__).parent.resolve()
@@ -56,5 +57,7 @@ class CordexContinuous(BaseOptimizer):
             return lambda x: self.model.compute_objective_input(x, i, j, model_matrix, runs, nx)
         elif isinstance(self.model, ScalarOnFunctionModel):
             return lambda x: self.model.compute_objective_input(x, i, j, model_matrix, sum(nx))
+        elif isinstance(self.model, ScalarOnScalar):
+            return lambda x: self.model.compute_objective_input(x, i, j, model_matrix)
         else:
             raise TypeError("Unsupported model type")
