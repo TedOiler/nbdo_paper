@@ -81,7 +81,7 @@ def plot_b_spline_basis(ax, T, w, k, run, size=35):
                zorder=1)  # support knots
 
 
-def subplot_b_spline_results(sub_x, sub_y, T, results, k, style='fivethirtyeight', size=35, show=True):
+def subplot_b_spline_results(sub_x, sub_y, T, results, k, style='fivethirtyeight', size=35, show=True, graph_title=None):
     if style is not None:
         plt.style.use(style)
     fig, axs = plt.subplots(sub_x, sub_y, figsize=(sub_x * sub_y, sub_x * sub_y), tight_layout=True)
@@ -95,6 +95,7 @@ def subplot_b_spline_results(sub_x, sub_y, T, results, k, style='fivethirtyeight
             except IndexError:
                 pass
             row_to_plot += 1
+    fig2 = plt.savefig(graph_title)
     if show:
         plt.show()
     return fig

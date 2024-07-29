@@ -2,6 +2,7 @@ from .base_model import BaseModel
 import numpy as np
 import os
 import sys
+import tensorflow as tf
 
 
 class ScalarOnFunctionModel(BaseModel):
@@ -33,6 +34,20 @@ class ScalarOnFunctionModel(BaseModel):
     def compute_objective_input(self, x, i, j, Model_mat, f_coeffs):
         Model_mat[i, j] = x
         return self.compute_objective(Model_mat, f_coeffs)
+
+    def compute_objective_tf(self, X, m, n):
+        ones = tf.ones((m, 1))
+        Gamma = X[:, :self.Kx[0]]
+        J_cb = tf.constant(self.J_cb, dtype=tf.float32)
+        Zetta = tf.concat([ones, tf.matmul(Gamma, J_cb)], axis=1)
+        Covar = tf.matmul(tf.transpose(Zetta), Zetta)
+        try:
+            P_inv = tf.linalg.inv(Covar)
+        except tf.errors.InvalidArgumentError:
+            return tf.constant(1e10, dtype=tf.float32)
+
+        value = tf.linalg.trace(P_inv)
+        return value
 
     def compute_Jcb(self):
         if self.Kx_family == 'step':

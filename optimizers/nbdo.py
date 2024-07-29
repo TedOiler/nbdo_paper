@@ -3,8 +3,16 @@ import random
 import tensorflow as tf
 from tensorflow.keras.layers import Input, Dense, Dropout, BatchNormalization, LeakyReLU, Lambda
 from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.optimizers import RMSprop
+from tensorflow.keras.backend import clear_session
+import gc
+
+from skopt import gp_minimize
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from tqdm import tqdm
+from matplotlib import pyplot as plt
 
 from pathlib import Path
 import sys
@@ -16,101 +24,123 @@ sys.path.append(str(parent_dir))
 from base_optimizer import BaseOptimizer
 from mathematical_models.f_on_f import FunctionOnFunctionModel
 from mathematical_models.s_on_f import ScalarOnFunctionModel
+from mathematical_models.s_on_s import ScalarOnScalar
 
 
-class NBDO(BaseOptimizer):
-    def __init__(self, model):
-        super().__init__(model)
+class Autoencoder:
+    def __init__(self, model, input_dim, latent_dim,
+                 base=2, max_layers=None, alpha=0.0,
+                 latent_space_activation='tanh', output_layer_activation='tanh'):
+        self.model = model
+        self.input_dim = input_dim
+        self.latent_dim = latent_dim
 
-    def create_ae(self, in_dim, lat_dim, lat_act='tanh',
-                  out_act='tanh', max_layers=None, alpha=0., base=2):
+        self.base = base
+        self.max_layers = max_layers
+        self.alpha = alpha
+        self.latent_space_activation = latent_space_activation
+        self.output_space_activation = output_layer_activation
 
-        # settings and checks
-        num_layers = int(np.log(in_dim) / np.log(base))
-        if max_layers is not None:
-            num_layers = min(num_layers, max_layers)
+        self.encoder = None
+        self.latent = None
+        self.decoder = None
+        self.autoencoder = None
+        self.num_layers = None
 
-        # Input
-        input_layer = Input(shape=(in_dim,))
-        # Encoder
-        encoder = input_layer
-        for i in range(num_layers):
-            n_neurons = int(in_dim / (2 ** (i + 1)))
-            encoder = Dense(n_neurons, activation=LeakyReLU(alpha=alpha))(encoder)
-        # Latent space
-        latent_space = Dense(lat_dim, activation=lat_act, name='lat_space')(encoder)
-        # Decoder
-        decoder = latent_space
-        for i in range(num_layers, 0, -1):
-            n_neurons = int(in_dim / (2 ** i))
-            decoder = Dense(n_neurons, activation=LeakyReLU(alpha=alpha))(decoder)
-        # Output
-        output_layer = Dense(in_dim, activation=out_act)(decoder)
+        self.input_layer = None
+        self.output_layer = None
 
-        # Initiate model
-        autoencoder = Model(inputs=input_layer, outputs=output_layer)
-        encoder = Model(inputs=input_layer, outputs=latent_space)
-        encoder_input = Input(shape=(lat_dim,))
+        self.train_set = None
+        self.val_set = None
 
-        decoder_output = encoder_input
-        decoder_layers = autoencoder.layers[-(num_layers + 1):]
-        for layer in decoder_layers:
-            decoder_output = layer(decoder_output)
-        decoder = Model(inputs=encoder_input, outputs=decoder_output)
+    def _build_encoder(self):
 
-        return autoencoder, encoder, decoder
+        self.num_layers = int(np.log(self.input_dim / self.latent_dim)) / np.log(self.base)
+        self.num_layers = min(self.num_layers, self.max_layers) if self.max_layers is not None else self.num_layers
 
-    def optimize(self, autoencoder, encoder, decoder, train_data, val_data, epochs=1_000,
-                 batch_size=32, patience=50, optimizer=RMSprop, loss=tf.keras.losses.Huber(), monitor='val_loss',
-                 alpha=1., m=None, n=None, J_cb=None, noise=0, optimizer_kwargs=None, SEED=42):
+        self.input_layer = Input(shape=(self.input_dim,))
+        encoder = self.input_layer
+        for layer in range(self.num_layers):
+            n_neurons = int(self.input_dim / self.base ** (layer + 1))
+            encoder = Dense(n_neurons, activation=LeakyReLU(alpha=self.alpha))(encoder)
 
-        def objective_function_tf(X, m, n, J_cb=None, noise=0):
-            batch_size = tf.shape(X)[0]
-            ones = tf.ones((batch_size, m, 1))
-            X = tf.reshape(X, (-1, m, n))
-            Z = tf.concat([ones, tf.matmul(X, J_cb)], axis=2)
+        latent = Dense(self.latent_dim, activation=self.latent_space_activation, name='latent')(encoder)
+        self.encoder = Model(self.input_layer, latent, name='encoder')
 
-            Z_transpose_Z = tf.matmul(Z, Z, transpose_a=True)
-            det_Z_transpose_Z = tf.linalg.det(Z_transpose_Z)
-            epsilon = 1e-06
-            condition = tf.abs(det_Z_transpose_Z)[:, None, None] < epsilon
+    def _build_decoder(self):
 
-            identity_matrix = tf.eye(tf.shape(Z_transpose_Z)[1], tf.shape(Z_transpose_Z)[2])
-            diagonal_part = tf.linalg.diag_part(Z_transpose_Z) + epsilon
-            Z_transpose_Z_epsilon = Z_transpose_Z + tf.linalg.diag(diagonal_part - tf.linalg.diag_part(Z_transpose_Z))
-            regularized_matrix = tf.where(condition, Z_transpose_Z_epsilon, Z_transpose_Z)
+        latent_inputs = Input(shape=(self.latent_dim,))
+        decoder = latent_inputs
+        for layer in range(self.num_layers, 0, -1):
+            n_neurons = int(self.input_dim / self.base ** layer)
+            decoder = Dense(n_neurons, activation=LeakyReLU(alpha=self.alpha))(decoder)
+        self.output_layer = Dense(self.input_dim, activation=self.output_space_activation)(decoder)
+        self.decoder = Model(latent_inputs, self.output_layer, name='decoder')
 
-            M = tf.linalg.inv(regularized_matrix)
-            result = tf.linalg.trace(M) + tf.random.normal([], mean=0, stddev=noise)
-            result = tf.where(result < 0, tf.constant(1e10), result)
-            return tf.reduce_mean(result)
+    def _build_autoencoder(self):
+        self._build_encoder()
+        self._build_decoder()
 
-        def combined_loss(alpha, loss_function, m, n, J_cb=None, noise=0):
-            def custom_loss(y_true, y_pred):
-                reconstruction_loss = loss_function(y_true, y_pred)
-                objective_value = objective_function_tf(y_pred, m, n, J_cb=J_cb, noise=noise)
-                return (1 - alpha) * reconstruction_loss + alpha * objective_value
+        autoencoder_input = self.input_layer
+        latent_representation = self.encoder(autoencoder_input)
+        autoencoder_output = self.decoder(latent_representation)
 
+        self.autoencoder = Model(autoencoder_input, autoencoder_output, name='autoencoder')
+
+    def _get_custom_loss(self):
+        if isinstance(self.model, ScalarOnFunctionModel):
+            def custom_loss(y_pred):
+                m = tf.shape(y_pred)[0]
+                n = tf.shape(y_pred)[1]
+                return self.model.compute_objective_tf(y_pred, m, n)
             return custom_loss
+        elif isinstance(self.model, FunctionOnFunctionModel):
+            return None
+        elif isinstance(self.model, ScalarOnScalar):
+            return None
 
-        random.seed(SEED)
-        np.random.seed(SEED)
-        tf.random.set_seed(SEED)
+    def compute_train_set(self, num_designs, runs,
+                          epsilon=1e-10):
+        design_matrix = []
+        valid_count = 0
 
-        # Create a new optimizer instance
-        if optimizer_kwargs is None:
-            optimizer_kwargs = {}
-        optimizer = optimizer(**optimizer_kwargs)
+        for _ in range(10_000):
+            if valid_count == num_designs:
+                break
+            candidate_matrix = np.random.uniform(-1, 1, size=(runs, self.model.Kx[0]))
+            if self.model.J_cb is not None:
+                Z = np.hstack((np.ones((runs, 1)), candidate_matrix @ self.model.J_cb))
+            else:
+                Z = np.hstack((np.ones((runs, 1)), candidate_matrix))
+            ZtZ = Z.T @ Z
+            determinant = np.linalg.det(ZtZ)
+            if determinant > epsilon:
+                design_matrix.append(candidate_matrix)
+                valid_count += 1
 
-        custom_loss = combined_loss(alpha, loss, m, n, J_cb=J_cb, noise=noise)
+        self.train_set, self.val_set = train_test_split(np.stack(design_matrix),
+                                                        test_size=0.2,
+                                                        random_state=42)
+        pass
 
-        # Train AE with EarlyStopping
-        autoencoder.compile(optimizer=optimizer, loss=custom_loss)
-        early_stopping = EarlyStopping(monitor=monitor, patience=patience, restore_best_weights=True)
-        history = autoencoder.fit(train_data, train_data,
-                                  epochs=epochs,
-                                  batch_size=batch_size,
-                                  validation_data=(val_data, val_data),
-                                  callbacks=[early_stopping])
+    def optimize(self, train_set, val_set, epochs, batch_size=32, patience=50,
+                 optimizer=RMSprop(), loss='mse'):
+        self._build_autoencoder()
+        custom_loss = self._get_custom_loss()
+        self.autoencoder.compile(optimizer=optimizer, loss=custom_loss)
+        early_stopping = EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+        history = self.autoencoder.fit(train_set, train_set,
+                                       epochs=epochs,
+                                       batch_size=batch_size,
+                                       validation_data=(val_set, val_set),
+                                       callbacks=[early_stopping])
 
-        return autoencoder, encoder, decoder, history
+        return self.autoencoder, self.encoder, self.decoder, history
+
+    def encode(self, x):
+        return self.encoder.predict(x)
+
+    def decode(self, latent):
+        return self.decoder.predict(latent)
+
+
