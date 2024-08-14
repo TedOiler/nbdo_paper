@@ -2,7 +2,7 @@ from .base_model import BaseModel
 import numpy as np
 
 
-class ScalarOnScalar(BaseModel):
+class ScalarOnScalarModel(BaseModel):
     def __init__(self, Kx):
         self.Kx = Kx
 

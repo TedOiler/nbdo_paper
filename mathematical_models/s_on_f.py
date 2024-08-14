@@ -36,6 +36,26 @@ class ScalarOnFunctionModel(BaseModel):
         return self.compute_objective(Model_mat, f_coeffs)
 
     def compute_objective_tf(self, X, m, n):
+        batch_size = tf.shape(X)[0]
+        ones = tf.ones((batch_size, m, 1))
+        X = tf.reshape(X, (-1, m, n))
+        Z = tf.concat([ones, tf.matmul(X, self.J_cb)], axis=2)
+
+        Z_t_Z = tf.matmul(Z, Z, transpose_a=True)
+        det = tf.linalg.det(Z_t_Z)
+        epsilon = 1e-6
+        condition = tf.abs(det)[:, None, None] < epsilon
+
+        diagonal = tf.linalg.diag_part(Z_t_Z) + epsilon
+        Z_t_Z_epsilon = Z_t_Z + tf.linalg.diag(diagonal - tf.linalg.diag_part(Z_t_Z))
+        Z_t_Z_regularized = tf.where(condition, Z_t_Z_epsilon, Z_t_Z)
+
+        M = tf.linalg.inv(Z_t_Z_regularized)
+        value = tf.linalg.trace(M)
+        value = tf.where(value < 0, tf.constant(1e10), value)
+        return value
+
+    def compute_objective_tf_2(self, X, m, n):
         ones = tf.ones((m, 1))
         Gamma = X[:, :self.Kx[0]]
         J_cb = tf.constant(self.J_cb, dtype=tf.float32)

@@ -24,15 +24,16 @@ sys.path.append(str(parent_dir))
 from base_optimizer import BaseOptimizer
 from mathematical_models.f_on_f import FunctionOnFunctionModel
 from mathematical_models.s_on_f import ScalarOnFunctionModel
-from mathematical_models.s_on_s import ScalarOnScalar
+from mathematical_models.s_on_s import ScalarOnScalarModel
 
 
-class Autoencoder:
-    def __init__(self, model, input_dim, latent_dim,
+class NBDO:
+    def __init__(self, model, latent_dim,
                  base=2, max_layers=None, alpha=0.0,
                  latent_space_activation='tanh', output_layer_activation='tanh'):
         self.model = model
-        self.input_dim = input_dim
+        self.runs = None
+        # self.input_dim = input_dim
         self.latent_dim = latent_dim
 
         self.base = base
@@ -41,6 +42,7 @@ class Autoencoder:
         self.latent_space_activation = latent_space_activation
         self.output_space_activation = output_layer_activation
 
+        self.input_dim = None
         self.encoder = None
         self.latent = None
         self.decoder = None
@@ -52,16 +54,52 @@ class Autoencoder:
 
         self.train_set = None
         self.val_set = None
+        self.history = None
+
+    def __repr__(self):
+        return f"NBDO(\n" \
+               f"  model: {self.model.__class__.__name__},\n" \
+               f"  max_layers: {self.max_layers},\n" \
+               f"  latent_dim: {self.latent_dim},\n" \
+               f"  input_dim: {self.input_dim},\n" \
+               f"  num_layers: {self.num_layers},\n" \
+               f"  train_set: {self.train_set.shape if self.train_set is not None else None},\n" \
+               f"  val_set: {self.val_set.shape if self.val_set is not None else None}\n" \
+               f"  base: {self.base},\n" \
+               f"  alpha: {self.alpha},\n" \
+               f"  latent_space_activation: {self.latent_space_activation},\n" \
+               f"  output_space_activation: {self.output_space_activation},\n" \
+               f")"
+
+    def __str__(self):
+        return f"NBDO Model Summary:\n" \
+               f"  Model Type: {self.model.__class__.__name__}\n" \
+               f"  --------------------------------------------\n" \
+               f"  Max Dimension: {self.max_layers}\n" \
+               f"  Input Dimension: {self.input_dim}\n" \
+               f"  Latent Dimension: {self.latent_dim}\n" \
+               f"  Number of Layers: {self.num_layers}\n" \
+               f"  --------------------------------------------\n" \
+               f"  Training Set Size: {self.train_set.shape[0] if self.train_set is not None else None}\n" \
+               f"  Validation Set Size: {self.val_set.shape[0] if self.val_set is not None else None}\n" \
+               f"  --------------------------------------------\n" \
+               f"  Base: {self.base}\n" \
+               f"  Alpha: {self.alpha}\n" \
+               f"  Latent Space Activation: {self.latent_space_activation}\n" \
+               f"  Output Space Activation: {self.output_space_activation}"
+
+    def _compute_something(self):
+        pass
 
     def _build_encoder(self):
 
-        self.num_layers = int(np.log(self.input_dim / self.latent_dim)) / np.log(self.base)
+        self.num_layers = int(np.log(self.input_dim / self.latent_dim) / np.log(self.base))
         self.num_layers = min(self.num_layers, self.max_layers) if self.max_layers is not None else self.num_layers
 
         self.input_layer = Input(shape=(self.input_dim,))
         encoder = self.input_layer
         for layer in range(self.num_layers):
-            n_neurons = int(self.input_dim / self.base ** (layer + 1))
+            n_neurons = int(self.input_dim / (self.base ** (layer + 1)))
             encoder = Dense(n_neurons, activation=LeakyReLU(alpha=self.alpha))(encoder)
 
         latent = Dense(self.latent_dim, activation=self.latent_space_activation, name='latent')(encoder)
@@ -89,58 +127,59 @@ class Autoencoder:
 
     def _get_custom_loss(self):
         if isinstance(self.model, ScalarOnFunctionModel):
-            def custom_loss(y_pred):
-                m = tf.shape(y_pred)[0]
-                n = tf.shape(y_pred)[1]
-                return self.model.compute_objective_tf(y_pred, m, n)
+            def custom_loss(y_true, y_pred):
+                reconstruction_loss = tf.keras.losses.MeanSquaredError()(y_true, y_pred)
+                m = self.runs
+                n = self.model.Kx[0]
+                objective_value = self.model.compute_objective_tf(y_pred, m, n)
+                return objective_value
+
             return custom_loss
         elif isinstance(self.model, FunctionOnFunctionModel):
             return None
-        elif isinstance(self.model, ScalarOnScalar):
+        elif isinstance(self.model, ScalarOnScalarModel):
             return None
 
     def compute_train_set(self, num_designs, runs,
                           epsilon=1e-10):
+        self.runs = runs
         design_matrix = []
         valid_count = 0
 
-        for _ in range(10_000):
+        for _ in range(num_designs*10):
             if valid_count == num_designs:
                 break
             candidate_matrix = np.random.uniform(-1, 1, size=(runs, self.model.Kx[0]))
-            if self.model.J_cb is not None:
-                Z = np.hstack((np.ones((runs, 1)), candidate_matrix @ self.model.J_cb))
-            else:
-                Z = np.hstack((np.ones((runs, 1)), candidate_matrix))
+            Z = np.hstack((np.ones((runs, 1)), candidate_matrix @ self.model.J_cb))
             ZtZ = Z.T @ Z
-            determinant = np.linalg.det(ZtZ)
-            if determinant > epsilon:
+            if np.linalg.det(ZtZ) > epsilon:
                 design_matrix.append(candidate_matrix)
                 valid_count += 1
-
-        self.train_set, self.val_set = train_test_split(np.stack(design_matrix),
+        reshaped_design_matrix = np.stack(design_matrix).reshape(num_designs, -1)
+        self.train_set, self.val_set = train_test_split(reshaped_design_matrix,
                                                         test_size=0.2,
                                                         random_state=42)
-        pass
+        self.input_dim = self.train_set.shape[1]
 
-    def optimize(self, train_set, val_set, epochs, batch_size=32, patience=50,
+    def optimize(self, epochs, batch_size=32, patience=50,
                  optimizer=RMSprop(), loss='mse'):
         self._build_autoencoder()
         custom_loss = self._get_custom_loss()
         self.autoencoder.compile(optimizer=optimizer, loss=custom_loss)
         early_stopping = EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
-        history = self.autoencoder.fit(train_set, train_set,
-                                       epochs=epochs,
-                                       batch_size=batch_size,
-                                       validation_data=(val_set, val_set),
-                                       callbacks=[early_stopping])
+        self.history = self.autoencoder.fit(self.train_set, self.train_set,
+                                            epochs=epochs,
+                                            batch_size=batch_size,
+                                            validation_data=(self.val_set, self.val_set),
+                                            callbacks=[early_stopping])
 
-        return self.autoencoder, self.encoder, self.decoder, history
+        return self.autoencoder, self.encoder, self.decoder, self.history
+
+    def latent_opt(self):
+        pass
 
     def encode(self, x):
         return self.encoder.predict(x)
 
     def decode(self, latent):
         return self.decoder.predict(latent)
-
-

@@ -5,7 +5,7 @@ from pathlib import Path
 from utilities.help.gen_rand_design import gen_rand_design_m
 from mathematical_models.f_on_f import FunctionOnFunctionModel
 from mathematical_models.s_on_f import ScalarOnFunctionModel
-from mathematical_models.s_on_s import ScalarOnScalar
+from mathematical_models.s_on_s import ScalarOnScalarModel
 from tqdm import tqdm
 
 current_dir = Path(__file__).parent.resolve()
