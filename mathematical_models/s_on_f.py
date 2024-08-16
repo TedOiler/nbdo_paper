@@ -16,6 +16,16 @@ class ScalarOnFunctionModel(BaseModel):
 
         self.J_cb = self.compute_Jcb()
 
+    def __str__(self):
+        return (f"ScalarOnFunctionModel(Kx={self.Kx}, Kb={self.Kb}, "
+                f"Kx_family='{self.Kx_family}', Kb_family='{self.Kb_family}', "
+                f"k_degree={self.k_degree}, knots_num={self.knots_num})")
+
+    def __repr__(self):
+        return (f"ScalarOnFunctionModel(Kx={self.Kx}, Kb={self.Kb}, "
+                f"Kx_family='{self.Kx_family}', Kb_family='{self.Kb_family}', "
+                f"k_degree={self.k_degree}, knots_num={self.knots_num})")
+
     def compute_objective(self, Model_mat, f_coeffs):
         ones = np.ones((Model_mat.shape[0], 1))
         Gamma = Model_mat[:, :f_coeffs]

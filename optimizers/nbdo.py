@@ -141,10 +141,16 @@ class NBDO:
         elif isinstance(self.model, FunctionOnFunctionModel):
             return None
         elif isinstance(self.model, ScalarOnScalarModel):
-            return None
+            def custom_loss(y_true, y_pred):
+                reconstruction_loss = tf.keras.losses.MeanSquaredError()(y_true, y_pred)
+                m = self.runs
+                n = self.model.Kx[0]
+                objective_value = self.model.compute_objective_tf(y_pred, m, n)
+                return objective_value
+            return custom_loss
 
-    def compute_train_set(self, num_designs, runs,
-                          epsilon=1e-10):
+    def compute_train_set(self, num_designs,
+                          runs, epsilon=1e-10):
         self.runs = runs
         design_matrix = []
         valid_count = 0
@@ -178,13 +184,21 @@ class NBDO:
 
         return self.history
 
-    def optimize(self, n_calls=10, acq_func='EI', acq_optimizer='sampling', n_random_starts=5, verbose=True):
+    def optimize(self, n_calls=10, acq_func='EI', acq_optimizer='sampling',
+                 n_random_starts=5, verbose=True):
 
         def objective(latent_var):
             latent_var = np.array(latent_var).reshape(1, -1)
             decoded = self.decoder.predict(latent_var)
-            optimality = self.model.compute_objective_bo(X=decoded, m=self.runs, n=self.model.Kx[0])
-            return optimality
+            if self.model.__class__.__name__ == 'ScalarOnFunctionModel':
+                optimality = self.model.compute_objective_bo(X=decoded, m=self.runs, n=self.model.Kx[0])
+                return optimality
+            elif self.model.__class__.__name__ == 'FunctionOnFunctionModel':
+                optimality = self.model.compute_objective_bo(X=decoded, m=self.runs, n=self.model.Kx[0])
+                return optimality
+            elif self.model.__class__.__name__ == 'ScalarOnScalarModel':
+                optimality = self.model.compute_objective_bo(X=decoded, m=self.runs, n=self.model.Kx[0])
+                return optimality
 
         dimensions = [(-1., 1.) for _ in range(self.latent_dim)]
         res = gp_minimize(objective, dimensions, n_calls=n_calls,
