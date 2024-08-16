@@ -47,8 +47,9 @@ The `optimizers` directory contains various optimization algorithms designed for
 
 ```python
 from system_optidex.optimizers.cordex_continuous import CordexContinuous
+
 optimizer = CordexContinuous()
-result = optimizer.optimize(your_model, your_parameters)
+result = optimizer.fit(your_model, your_parameters)
 ```
 
 ### Mathematical Models

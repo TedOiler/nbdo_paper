@@ -56,6 +56,12 @@ class NBDO:
         self.val_set = None
         self.history = None
 
+        self.optimal_latent_var = None
+        self.optimal_cr = None
+        self.optimal_des = None
+        self.search_history = None
+        self.eval_history = None
+
     def __repr__(self):
         return f"NBDO(\n" \
                f"  model: {self.model.__class__.__name__},\n" \
@@ -87,9 +93,6 @@ class NBDO:
                f"  Alpha: {self.alpha}\n" \
                f"  Latent Space Activation: {self.latent_space_activation}\n" \
                f"  Output Space Activation: {self.output_space_activation}"
-
-    def _compute_something(self):
-        pass
 
     def _build_encoder(self):
 
@@ -161,8 +164,8 @@ class NBDO:
                                                         random_state=42)
         self.input_dim = self.train_set.shape[1]
 
-    def optimize(self, epochs, batch_size=32, patience=50,
-                 optimizer=RMSprop(), loss='mse'):
+    def fit(self, epochs, batch_size=32,
+            patience=50, optimizer=RMSprop()):
         self._build_autoencoder()
         custom_loss = self._get_custom_loss()
         self.autoencoder.compile(optimizer=optimizer, loss=custom_loss)
@@ -173,13 +176,30 @@ class NBDO:
                                             validation_data=(self.val_set, self.val_set),
                                             callbacks=[early_stopping])
 
-        return self.autoencoder, self.encoder, self.decoder, self.history
+        return self.history
 
-    def latent_opt(self):
-        pass
+    def optimize(self, n_calls=10, acq_func='EI', acq_optimizer='sampling', n_random_starts=5, verbose=True):
 
-    def encode(self, x):
-        return self.encoder.predict(x)
+        def objective(latent_var):
+            latent_var = np.array(latent_var).reshape(1, -1)
+            decoded = self.decoder.predict(latent_var)
+            optimality = self.model.compute_objective_bo(X=decoded, m=self.runs, n=self.model.Kx[0])
+            return optimality
+
+        dimensions = [(-1., 1.) for _ in range(self.latent_dim)]
+        res = gp_minimize(objective, dimensions, n_calls=n_calls,
+                          random_state=42, verbose=verbose, n_jobs=-1,
+                          n_random_starts=n_random_starts, acq_func=acq_func, acq_optimizer=acq_optimizer)
+        self.optimal_latent_var = res.x
+        self.optimal_cr = res.fun
+        self.optimal_des = self.decode(np.array(self.optimal_latent_var).reshape(1, -1))
+        self.search_history = res.x_iters
+        self.eval_history = res.func_vals
+
+        return self.optimal_cr, self.optimal_des
+
+    def encode(self, design):
+        return self.encoder.predict(design.reshape(1, -1))
 
     def decode(self, latent):
-        return self.decoder.predict(latent)
+        return self.decoder.predict(latent).reshape(self.runs, -1)

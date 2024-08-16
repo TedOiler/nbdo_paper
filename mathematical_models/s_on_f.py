@@ -43,7 +43,7 @@ class ScalarOnFunctionModel(BaseModel):
 
         Z_t_Z = tf.matmul(Z, Z, transpose_a=True)
         det = tf.linalg.det(Z_t_Z)
-        epsilon = 1e-6
+        epsilon = 1e-6  # TODO: affects results significantly!! need to find out how to set it dynamically.
         condition = tf.abs(det)[:, None, None] < epsilon
 
         diagonal = tf.linalg.diag_part(Z_t_Z) + epsilon
@@ -52,22 +52,18 @@ class ScalarOnFunctionModel(BaseModel):
 
         M = tf.linalg.inv(Z_t_Z_regularized)
         value = tf.linalg.trace(M)
-        value = tf.where(value < 0, tf.constant(1e10), value)
-        return value
+        return tf.where(value < 0, tf.constant(1e10), value)
 
-    def compute_objective_tf_2(self, X, m, n):
-        ones = tf.ones((m, 1))
-        Gamma = X[:, :self.Kx[0]]
-        J_cb = tf.constant(self.J_cb, dtype=tf.float32)
-        Zetta = tf.concat([ones, tf.matmul(Gamma, J_cb)], axis=1)
-        Covar = tf.matmul(tf.transpose(Zetta), Zetta)
+    def compute_objective_bo(self, X, m, n):
+        ones = np.ones((m, 1)).reshape(-1, 1)
+        X = np.array(X).reshape(m, n)
+        Z = np.hstack((ones, X @ self.J_cb))
         try:
-            P_inv = tf.linalg.inv(Covar)
-        except tf.errors.InvalidArgumentError:
-            return tf.constant(1e10, dtype=tf.float32)
-
-        value = tf.linalg.trace(P_inv)
-        return value
+            M = np.linalg.inv(Z.T @ Z)
+        except np.linalg.LinAlgError:
+            return 1e10
+        result = np.trace(M)
+        return 1e10 if result < 0 else result
 
     def compute_Jcb(self):
         if self.Kx_family == 'step':
