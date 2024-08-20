@@ -3,8 +3,6 @@ import numpy as np
 import tensorflow as tf
 
 
-
-
 class ScalarOnScalarModel(BaseModel):
     def __init__(self, Kx):
         self.Kx = Kx
@@ -15,6 +13,12 @@ class ScalarOnScalarModel(BaseModel):
 
     def __repr__(self):
         return f"ScalarOnScalarModel(Kx={self.Kx}, J_cb=Identity matrix of size {self.J_cb.shape})"
+
+    def Covar(self, Model_mat):
+        ones = np.ones((Model_mat.shape[0], 1))
+        Zetta = np.concatenate((ones, Model_mat), axis=1)
+        Covar = Zetta.T @ Zetta
+        return Covar
 
     def compute_objective(self, Model_mat):
         ones = np.ones((Model_mat.shape[0], 1))

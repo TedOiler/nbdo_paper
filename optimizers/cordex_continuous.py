@@ -56,7 +56,7 @@ class CordexContinuous(BaseOptimizer):
         if isinstance(self.model, FunctionOnFunctionModel):
             return lambda x: self.model.compute_objective_input(x, i, j, model_matrix, runs, nx)
         elif isinstance(self.model, ScalarOnFunctionModel):
-            return lambda x: self.model.compute_objective_input(x, i, j, model_matrix, sum(nx))
+            return lambda x: self. model.compute_objective_input(x, i, j, model_matrix, sum(nx))
         elif isinstance(self.model, ScalarOnScalarModel):
             return lambda x: self.model.compute_objective_input(x, i, j, model_matrix)
         else:

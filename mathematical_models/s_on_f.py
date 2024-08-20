@@ -26,12 +26,23 @@ class ScalarOnFunctionModel(BaseModel):
                 f"Kx_family='{self.Kx_family}', Kb_family='{self.Kb_family}', "
                 f"k_degree={self.k_degree}, knots_num={self.knots_num})")
 
-    def compute_objective(self, Model_mat, f_coeffs):
-        ones = np.ones((Model_mat.shape[0], 1))
-        Gamma = Model_mat[:, :f_coeffs]
-        Zetta = np.concatenate((ones, Gamma @ self.J_cb), axis=1)
-        Covar = Zetta.T @ Zetta
+    def Covar(self, Model_mat, f_coeffs, library):
+        if library == 'numpy':
+            ones = np.ones((Model_mat.shape[0], 1))
+            Gamma = Model_mat[:, :f_coeffs]
+            Zetta = np.concatenate((ones, Gamma @ self.J_cb), axis=1)
+            Covar = Zetta.T @ Zetta
+            return Covar
+        elif library == 'tensorflow':
+            batch_size = tf.shape(Model_mat)[0]
+            ones = tf.ones((batch_size, f_coeffs, 1))
+            X = tf.reshape(Model_mat, (-1, f_coeffs, n))
+            Z = tf.concat([ones, tf.matmul(X, self.J_cb)], axis=2)
+            Covar = tf.matmul(Z, Z, transpose_a=True)
+            return Covar
 
+    def compute_objective(self, Model_mat, f_coeffs):
+        Covar = self.Covar(Model_mat, f_coeffs, library='numpy')
         try:
             P_inv = np.linalg.inv(Covar)
         except np.linalg.LinAlgError:
@@ -46,12 +57,13 @@ class ScalarOnFunctionModel(BaseModel):
         return self.compute_objective(Model_mat, f_coeffs)
 
     def compute_objective_tf(self, X, m, n):
+        Covar = self.Covar(X, m, library='tensorflow')
         batch_size = tf.shape(X)[0]
         ones = tf.ones((batch_size, m, 1))
         X = tf.reshape(X, (-1, m, n))
         Z = tf.concat([ones, tf.matmul(X, self.J_cb)], axis=2)
-
         Z_t_Z = tf.matmul(Z, Z, transpose_a=True)
+
         det = tf.linalg.det(Z_t_Z)
         epsilon = 1e-6  # TODO: affects results significantly!! need to find out how to set it dynamically.
         condition = tf.abs(det)[:, None, None] < epsilon
