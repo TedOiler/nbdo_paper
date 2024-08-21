@@ -20,7 +20,7 @@ class CordexDiscrete(BaseOptimizer):
         self.runs = runs
         self.levels = levels
 
-    def optimize(self, epochs=1000, refinement_iterations=100):
+    def optimize(self, epochs=1000, refinement_epochs=100):
         best_design, best_optimality_value = None, np.inf
 
         for _ in tqdm(range(epochs)):
@@ -28,8 +28,8 @@ class CordexDiscrete(BaseOptimizer):
             best_design, best_optimality_value = self._cordex_loop(
                 Gamma, best_optimality_value, best_design)
 
-        if refinement_iterations > 0:
-            for _ in tqdm(range(refinement_iterations)):
+        if refinement_epochs > 0:
+            for _ in tqdm(range(refinement_epochs)):
                 best_design, best_optimality_value = self._cordex_loop(
                     best_design, best_optimality_value, best_design)
 

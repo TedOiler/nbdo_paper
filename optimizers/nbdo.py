@@ -171,11 +171,12 @@ class NBDO:
         self.input_dim = self.train_set.shape[1]
 
     def fit(self, epochs, batch_size=32,
-            patience=50, optimizer=RMSprop()):
+            patience=50, optimizer=tf.keras.optimizers.legacy.RMSprop()):
         self._build_autoencoder()
         custom_loss = self._get_custom_loss()
         self.autoencoder.compile(optimizer=optimizer, loss=custom_loss)
         early_stopping = EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+        self.autoencoder.build(input_shape=(None, self.input_dim))
         self.history = self.autoencoder.fit(self.train_set, self.train_set,
                                             epochs=epochs,
                                             batch_size=batch_size,
@@ -209,8 +210,14 @@ class NBDO:
         self.optimal_des = self.decode(np.array(self.optimal_latent_var).reshape(1, -1))
         self.search_history = res.x_iters
         self.eval_history = res.func_vals
-
+        clear_session()
         return self.optimal_cr, self.optimal_des
+
+    def clear_memory(self):
+        del self.autoencoder
+        del self.encoder
+        del self.decoder
+        gc.collect()
 
     def encode(self, design):
         return self.encoder.predict(design.reshape(1, -1))
