@@ -3,6 +3,7 @@ import numpy as np
 import os
 import sys
 from scipy.linalg import block_diag
+import tensorflow as tf
 
 
 class FunctionOnFunctionModel(BaseModel):
@@ -35,16 +36,43 @@ class FunctionOnFunctionModel(BaseModel):
         Gamma_[i, j] = x
         return self.compute_objective(Gamma_, N, Kx)
 
-    def compute_objective_relative(self, Gamma, N, Kx, Sigma_new, objective_old):
-        Gamma_mat = np.hstack((np.ones((N, 1)), Gamma))
-        Z = Gamma_mat @ self.J_CH
-        ZtZ_inv = np.linalg.inv(Z.T @ Z)
+        def compute_objective_tf(self, Gamma_, N, Kx):
+            Gamma = tf.concat([tf.ones((N, 1)), Gamma_], axis=1)
+        Z = tf.matmul(Gamma, self.J_CH)
+        ZtZ = tf.matmul(Z, Z, transpose_a=True)
 
-        # A-optimality: Trace of the covariance matrix
-        objective_new = np.trace(ZtZ_inv) * np.trace(Sigma_new)
+        try:
+            ZtZ_inv = tf.linalg.inv(ZtZ)
+            value = tf.linalg.trace(ZtZ_inv) * tf.linalg.trace(self.Sigma)
+        except tf.errors.InvalidArgumentError:
+            return tf.constant(np.nan)
 
-        # In practice, you might want to ensure 'value' is valid (e.g., not NaN or Inf) before returning
-        return np.exp(np.log(objective_new) - np.log(objective_old)) if np.isfinite(objective_new) else np.nan
+        return tf.where(tf.math.is_finite(value), value, tf.constant(np.nan))
+
+    def compute_objective_tf(self, Gamma_, N, Kx):
+        Gamma = tf.concat([tf.ones((N, 1)), Gamma_], axis=1)
+        Z = tf.matmul(Gamma, self.J_CH)
+        ZtZ = tf.matmul(Z, Z, transpose_a=True)
+
+        try:
+            ZtZ_inv = tf.linalg.inv(ZtZ)
+            value = tf.linalg.trace(ZtZ_inv) * tf.linalg.trace(self.Sigma)
+        except tf.errors.InvalidArgumentError:
+            return tf.constant(np.nan)
+
+        return tf.where(tf.math.is_finite(value), value, tf.constant(np.nan))
+
+    def compute_objective_bo(self, Gamma_, N, Kx):
+        Gamma = np.hstack((np.ones((N, 1)), Gamma_))
+        Z = Gamma @ self.J_CH
+
+        try:
+            ZtZ_inv = np.linalg.inv(Z.T @ Z)
+            value = np.trace(ZtZ_inv) * np.trace(self.Sigma)
+        except np.linalg.LinAlgError:
+            return 1e10
+
+        return 1e10 if value < 0 else value
 
     def compute_Jcb(self):
         if self.Kx_family == 'step':

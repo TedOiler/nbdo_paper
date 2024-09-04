@@ -1,6 +1,5 @@
 import sys
 import os
-import numpy as np
 import pandas as pd
 from time import time
 from datetime import timedelta
@@ -30,9 +29,13 @@ columns = ["runID",
 file_exists = os.path.isfile(csv_file_path)
 df = pd.DataFrame(columns=columns)
 
-Kxs = [[4], [8], [12], [20], [40]]
-Runs = [5, 15, 30, 50, 60]
-Epochs = 1000
+Kxs = [[15], [30], [40], [50]]
+Runs = [60, 70, 80, 100]
+
+Epochs = 100
+num_designs = 100
+latent_dim = 4
+patience = 50
 
 count = 0
 for Kx in Kxs:
@@ -43,10 +46,10 @@ for Kx in Kxs:
             continue
         print(f'Run {count} Started with Kx-{Kx[0]} and Runs-{runs}')
         model = ScalarOnScalarModel(Kx=Kx)
-        optimizer = NBDO(model=model, latent_dim=4)
+        optimizer = NBDO(model=model, latent_dim=latent_dim)
         start_time = time()
-        optimizer.compute_train_set(num_designs=1000, runs=runs)
-        history = optimizer.fit(epochs=Epochs)
+        optimizer.compute_train_set(num_designs=num_designs, runs=runs)
+        history = optimizer.fit(epochs=Epochs, patience=patience)
         opt_cr, opt_des = optimizer.optimize()
         end_time = time()
         optimizer.clear_memory()
@@ -57,14 +60,14 @@ for Kx in Kxs:
             "runID": count,
             "model": "ScalarOnScalarModel",
             "runs": runs,
-            "Kx": Kx,
+            "Kx": Kx[0],
             "algo": "NBDO",
             "epochs": Epochs,
             "refinement_epochs": None,
             "levels": None,
-            "latent_dim": 4,
+            "latent_dim": latent_dim,
             "num_layers": optimizer.num_layers,
-            "num_designs": 1000,
+            "num_designs": num_designs,
             "opt_cr": opt_cr,
             "opt_des": opt_des,
             "run_time_s": run_time,

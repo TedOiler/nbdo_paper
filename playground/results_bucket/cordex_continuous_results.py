@@ -1,6 +1,5 @@
 import sys
 import os
-import numpy as np
 import pandas as pd
 from time import time
 from datetime import timedelta
@@ -30,14 +29,14 @@ columns = ["runID",
 file_exists = os.path.isfile(csv_file_path)
 df = pd.DataFrame(columns=columns)
 
-Kxs = [[4], [8], [12], [20], [40]]
-Runs = [5, 15, 30, 50, 60]
-Epochs = 1000
-Refinement_epochs = 100
+Kxs = [[15], [30], [40], [50]]
+Runs = [60, 70, 80, 100]
+Epochs = 10
+Refinement_epochs = 1
 
 count = 0
-for Kx in Kxs:
-    for runs in Runs:
+for Kx_index, Kx in enumerate(Kxs):
+    for run_index, runs in enumerate(Runs):
         if runs + 1 < Kx[0]:
             print(f'Run {count} Completed. Execution Time: 0')
             count += 1
@@ -45,6 +44,7 @@ for Kx in Kxs:
         print(f'Run {count} Started with Kx-{Kx[0]} and Runs-{runs}')
         model = ScalarOnScalarModel(Kx=Kx)
         optimizer = CordexContinuous(model=model, runs=runs)
+
         start_time = time()
         opt_des, opt_cr = optimizer.optimize(epochs=Epochs, refinement_epochs=Refinement_epochs)
         end_time = time()
@@ -54,7 +54,7 @@ for Kx in Kxs:
             "runID": count,
             "model": "ScalarOnScalarModel",
             "runs": runs,
-            "Kx": Kx,
+            "Kx": Kx[0],
             "algo": "CordexContinuous",
             "epochs": Epochs,
             "refinement_epochs": Refinement_epochs,
