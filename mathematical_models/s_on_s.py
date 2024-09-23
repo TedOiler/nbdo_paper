@@ -1,12 +1,14 @@
 from .base_model import BaseModel
 import numpy as np
 import tensorflow as tf
+from itertools import combinations_with_replacement
 
 
 class ScalarOnScalarModel(BaseModel):
-    def __init__(self, Kx):
+    def __init__(self, Kx, order=1):
         self.Kx = Kx
         self.J_cb = self.compute_Jcb()
+        self.order = order
 
     def __str__(self):
         return f"ScalarOnScalarModel(Kx={self.Kx}, J_cb=Identity matrix of size {self.J_cb.shape})"
@@ -14,16 +16,24 @@ class ScalarOnScalarModel(BaseModel):
     def __repr__(self):
         return f"ScalarOnScalarModel(Kx={self.Kx}, J_cb=Identity matrix of size {self.J_cb.shape})"
 
-    def Covar(self, Model_mat):
-        ones = np.ones((Model_mat.shape[0], 1))
-        Zetta = np.concatenate((ones, Model_mat), axis=1)
-        Covar = Zetta.T @ Zetta
+    def calc_model_matrix(self, X):
+        X = np.asarray(X)
+        n_samples, n_features = X.shape
+        model_mat = np.ones((n_samples, 1))
+
+        for o in range(1, self.order + 1):
+            for combo in combinations_with_replacement(range(n_features), o):
+                term = np.prod([X[:, i] for i in combo], axis=0)
+                model_mat = np.hstack((model_mat, term[:, np.newaxis]))
+        return model_mat
+
+    def calc_covar_matrix(self, Model_mat):
+        model_mat = self.calc_model_matrix(Model_mat)
+        Covar = model_mat.T @ model_mat
         return Covar
 
     def compute_objective(self, Model_mat):
-        ones = np.ones((Model_mat.shape[0], 1))
-        Zetta = np.concatenate((ones, Model_mat), axis=1)
-        Covar = Zetta.T @ Zetta
+        Covar = self.calc_covar_matrix(Model_mat)
 
         try:
             P_inv = np.linalg.inv(Covar)
@@ -37,10 +47,13 @@ class ScalarOnScalarModel(BaseModel):
         Model_mat[i, j] = x
         return self.compute_objective(Model_mat)
 
+# ---------------------------------------- Tensorflow ----------------------------------------
+
     def compute_objective_tf(self, X, m, n):
         batch_size = tf.shape(X)[0]
         ones = tf.ones((batch_size, m, 1))
         X = tf.reshape(X, (-1, m, n))
+        print(X)
         Z = tf.concat([ones, tf.matmul(X, self.J_cb)], axis=2)
 
         Z_t_Z = tf.matmul(Z, Z, transpose_a=True)

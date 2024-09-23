@@ -151,16 +151,32 @@ class NBDO:
 
     def compute_train_set(self, num_designs,
                           runs, epsilon=1e-10):
+
+        def model_matrix_columns(n, p):
+            from math import comb
+            if p == 0:
+                return n
+            return comb(n + p, p)
+
         self.runs = runs
         design_matrix = []
         valid_count = 0
+        try:
+            size = model_matrix_columns(self.model.Kx[0], self.model.order)
+        except:
+            size = 0
 
         for _ in range(num_designs*10):
             if valid_count == num_designs:
                 break
-            candidate_matrix = np.random.uniform(-1, 1, size=(runs, self.model.Kx[0]))
-            Z = np.hstack((np.ones((runs, 1)), candidate_matrix @ self.model.J_cb))
-            ZtZ = Z.T @ Z
+
+            if isinstance(self.model, ScalarOnScalarModel):
+                candidate_matrix = np.random.uniform(-1, 1, size=(runs, size))
+                ZtZ = self.model.calc_covar_matrix(candidate_matrix)
+            else:
+                candidate_matrix = np.random.uniform(-1, 1, size=(runs, self.model.Kx[0]))
+                Z = np.hstack((np.ones((runs, 1)), candidate_matrix @ self.model.J_cb))
+                ZtZ = Z.T @ Z
             if np.linalg.det(ZtZ) > epsilon:
                 design_matrix.append(candidate_matrix)
                 valid_count += 1

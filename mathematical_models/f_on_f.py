@@ -7,7 +7,7 @@ import tensorflow as tf
 
 
 class FunctionOnFunctionModel(BaseModel):
-    def __init__(self, Kx, Kb, Kx_family, Ky, Kb_family='polynomial', k_degree=None, Sigma_decay=0):
+    def __init__(self, Kx, Kb, Kx_family, Ky, Kb_family='polynomial', k_degree=None, Sigma_decay=0, J_cb=None):
         self.Kx_family = Kx_family
         self.Kx = Kx
         self.Kb_family = Kb_family
@@ -16,11 +16,17 @@ class FunctionOnFunctionModel(BaseModel):
         self.k_degree = k_degree
 
         self.knots_num = self.Kx[0] + 1
-        self.J_CH = self.compute_Jcb()
+        if J_cb is None:
+            self.J_CH = self.compute_Jcb()
+        else:
+            self.J_CH = J_cb
         self.Sigma_decay = Sigma_decay
         self.Sigma = self.compute_Sigma()
 
-        self.J_cb = self.compute_Jcb()
+        if J_cb is None:
+            self.J_cb = self.compute_Jcb()
+        else:
+            self.J_cb = J_cb
 
     def compute_objective(self, Gamma_, N, Kx):
         Gamma = np.hstack((np.ones((N, 1)), Gamma_))
