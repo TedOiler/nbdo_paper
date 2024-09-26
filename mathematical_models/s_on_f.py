@@ -1,4 +1,5 @@
 from .base_model import BaseModel
+from basis.basis import Basis
 import numpy as np
 import os
 import sys

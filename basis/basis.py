@@ -31,7 +31,7 @@ class Basis:
         plt.title(f'{self.__class__.__name__} Functions')
         plt.xlabel('t')
         plt.ylabel('basis function value')
-        plt.grid(True)
+        plt.grid(False)
         plt.ylim(-1.2, 1.2)
         plt.show()
 

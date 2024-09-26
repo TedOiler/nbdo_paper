@@ -2,9 +2,9 @@ from .basis import Basis
 
 
 class PolynomialBasis(Basis):
-    def __init__(self, degrees):
-        self.degrees = degrees  # List of degrees for each basis function
-        self.num_basis_functions = len(degrees)
+    def __init__(self, degree):
+        self.degrees = list(range(degree))
+        self.num_basis_functions = len(self.degrees)
 
     def evaluate_basis_function(self, i, t):
         return t ** self.degrees[i]
