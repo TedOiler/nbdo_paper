@@ -1,21 +1,11 @@
-# app/app.py
-
 import sys
 import os
+from math import ceil
 import streamlit as st
-import numpy as np
-import matplotlib.pyplot as plt
+st.set_option('deprecation.showPyplotGlobalUse', False)
 
-# Set the page configuration to 'wide' to utilize the full width of the browser
-st.set_page_config(page_title="Optimization Design Explorer", layout="wide")
-
-# Get the absolute path of the current file
 current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Get the root directory of the project
 root_dir = os.path.abspath(os.path.join(current_dir, '..'))
-
-# Add the root directory to sys.path
 sys.path.insert(0, root_dir)
 
 # Import your modules
@@ -45,16 +35,21 @@ def main():
         with col_alg2:
             # Number of Runs (N)
             N = st.number_input("Number of Runs (N)", min_value=1, value=6, step=1, key="N_runs")
+            col_3_1, col_3_2 = st.columns(2)
+            with col_3_1:
+                # Subplots in X
+                sub_x = st.number_input("sub_x", min_value=1, value=3, step=1, key="sub_x")
+            with col_3_2:
+                # Subplots in Y
+                sub_y = st.number_input("sub_y", min_value=1, value=int(ceil(N/sub_x)), step=1, key="sub_y")
         with col_alg3:
             # Epochs
             epochs = st.number_input("Epochs", min_value=1, value=100, step=1, key="epochs")
-            sub_x = st.number_input("sub_x", min_value=1, value=3, step=1, key="sub_x")
 
         with col_alg4:
             # Refinement Epochs
             refinement_epochs = st.number_input("Refinement Epochs", min_value=1, value=10, step=1,
                                                 key="refinement_epochs")
-            sub_y = st.number_input("sub_y", min_value=1, value=3, step=1, key="sub_y")
 
     st.markdown("---")  # Separator line
 
@@ -84,7 +79,7 @@ def main():
             subcol_x, subcol_b = st.columns(2)
 
             with subcol_x:
-                st.markdown("**🔍 X Basis Configuration**")
+                st.markdown("**X Basis Configuration**")
                 # X Basis
                 x_basis_type = st.selectbox(
                     f"X Basis Type for Pair {i + 1}",

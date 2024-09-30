@@ -24,13 +24,31 @@ def plot_design(design, basis_list, runs, t_detail=100, style='seaborn-v0_8', su
     for i in range(y_values.shape[1]):  # i bases
         fig, axes = plt.subplots(sub_x, sub_y)
         axes = axes.flatten()
+
+        # Calculate breakpoints for the current basis
+        num_basis = basis_list[i].num_basis()
+        degree_basis = basis_list[i].degree
+        break_points = np.linspace(0, 1, (num_basis + degree_basis + 1) - 2 * (degree_basis + 1) + 2) # TODO work this out correctly now I think it's wrong.
+
+        # Initialize a list to store y-values at breakpoints for all runs
+        y_break_points = []
+
+        # Evaluate the combination of basis functions at breakpoints for each run
+        for j in range(runs):
+            coeffs = coefficients_split[i][j]
+            y_bp = basis_list[i].evaluate_combination(coeffs, break_points)
+            y_break_points.append(y_bp)
+
+        y_break_points = np.array(y_break_points)  # Shape: (runs, num_basis)
+
         for j in range(y_values.shape[0]):  # j runs
             axes[j].plot(t_values, y_values[j][i])
+            axes[j].plot(break_points, y_break_points[j], 'o')
             axes[j].set_title(f'Run {j + 1}')
             axes[j].set_xlabel('t')
             axes[j].grid(False)
             axes[j].set_ylim(-1.2, 1.2)
-        fig.suptitle(f'Functional Factor {i + 1}', fontsize=16)
+        fig.suptitle(f'Functional Factor {i + 1} ', fontsize=16)
         plt.tight_layout()
         plt.show()
 
