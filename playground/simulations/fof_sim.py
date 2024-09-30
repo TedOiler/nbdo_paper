@@ -62,11 +62,11 @@ def compute_convolution(fdobj: FDataGrid, bifdobj: FDataGrid,
     return FDataGrid(data_matrix=convolution_y, grid_points=eval_y)
 
 
-### Radial Basis Function Kernel (RBF) ###
+### Radial basis Function Kernel (RBF) ###
 
 def RBF(x1: np.ndarray, x2: np.ndarray, par: Tuple[float, float]) -> float:
     """
-    Radial Basis Function (RBF) kernel for Gaussian Process.
+    Radial basis Function (RBF) kernel for Gaussian Process.
     """
     h: float = np.dot((x1 - x2).T, (x1 - x2)) / par[1]
     return par[0] * np.exp(-h / 2)
@@ -113,7 +113,7 @@ def plot_fd_object(fd_obj: FDataGrid) -> None:
     fd_obj.plot()
 
 
-### Coefficient and Basis Functions Setup ###
+### Coefficient and basis Functions Setup ###
 
 def setup_true_coefficient_beta(n_s: int, n_t: int) -> FDataGrid:
     """

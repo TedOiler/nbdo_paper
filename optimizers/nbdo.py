@@ -175,7 +175,7 @@ class NBDO:
                 ZtZ = self.model.calc_covar_matrix(candidate_matrix)
             else:
                 candidate_matrix = np.random.uniform(-1, 1, size=(runs, self.model.Kx[0]))
-                Z = np.hstack((np.ones((runs, 1)), candidate_matrix @ self.model.J_cb))
+                Z = np.hstack((np.ones((runs, 1)), candidate_matrix @ self.model.J))
                 ZtZ = Z.T @ Z
             if np.linalg.det(ZtZ) > epsilon:
                 design_matrix.append(candidate_matrix)

@@ -1,20 +1,19 @@
 from .base_model import BaseModel
+from J.jmatrix import JMatrix
+from basis.bspline import BSplineBasis
+from basis.polynomial import PolynomialBasis
+from basis.fourier import FourierBasis
 import numpy as np
-import os
-import sys
 import tensorflow as tf
 
 
 class ScalarOnFunctionModel(BaseModel):
-    def __init__(self, Kx, Kb, Kx_family, Kb_family='polynomial', k_degree=None, knots_num=None):
-        self.Kx_family = Kx_family
-        self.Kx = Kx
-        self.Kb_family = Kb_family
-        self.Kb = Kb
-        self.k_degree = k_degree
-        self.knots_num = self.Kx[0] + 1
+    def __init__(self, bases_pairs=None):
 
-        self.J_cb = self.compute_Jcb()
+        self.basis_pairs = bases_pairs
+        self.J = self.compute_J()
+        self.Kx = self.J.shape[0]
+        self.Kb = self.J.shape[1]
 
     def __str__(self):
         return (f"ScalarOnFunctionModel(Kx={self.Kx}, Kb={self.Kb}, "
@@ -26,23 +25,22 @@ class ScalarOnFunctionModel(BaseModel):
                 f"Kx_family='{self.Kx_family}', Kb_family='{self.Kb_family}', "
                 f"k_degree={self.k_degree}, knots_num={self.knots_num})")
 
-    def Covar(self, Model_mat, f_coeffs, library):
+    def Covar(self, Gamma, library):
         if library == 'numpy':
-            ones = np.ones((Model_mat.shape[0], 1))
-            Gamma = Model_mat[:, :f_coeffs]
-            Zetta = np.concatenate((ones, Gamma @ self.J_cb), axis=1)
+            ones = np.ones((Gamma.shape[0], 1))
+            Zetta = np.concatenate((ones, Gamma @ self.J), axis=1)
             Covar = Zetta.T @ Zetta
             return Covar
         elif library == 'tensorflow':
             batch_size = tf.shape(Model_mat)[0]
             ones = tf.ones((batch_size, f_coeffs, 1))
             X = tf.reshape(Model_mat, (-1, f_coeffs, n))
-            Z = tf.concat([ones, tf.matmul(X, self.J_cb)], axis=2)
+            Z = tf.concat([ones, tf.matmul(X, self.J)], axis=2)
             Covar = tf.matmul(Z, Z, transpose_a=True)
             return Covar
 
-    def compute_objective(self, Model_mat, f_coeffs):
-        Covar = self.Covar(Model_mat, f_coeffs, library='numpy')
+    def compute_objective(self, Gamma):
+        Covar = self.Covar(Gamma, library='numpy')
         try:
             P_inv = np.linalg.inv(Covar)
         except np.linalg.LinAlgError:
@@ -52,16 +50,16 @@ class ScalarOnFunctionModel(BaseModel):
 
         return value
 
-    def compute_objective_input(self, x, i, j, Model_mat, f_coeffs):
-        Model_mat[i, j] = x
-        return self.compute_objective(Model_mat, f_coeffs)
+    def compute_objective_input(self, x, i, j, Gamma):
+        Gamma[i, j] = x
+        return self.compute_objective(Gamma)
 
     def compute_objective_tf(self, X, m, n):
         Covar = self.Covar(X, m, library='tensorflow')
         batch_size = tf.shape(X)[0]
         ones = tf.ones((batch_size, m, 1))
         X = tf.reshape(X, (-1, m, n))
-        Z = tf.concat([ones, tf.matmul(X, self.J_cb)], axis=2)
+        Z = tf.concat([ones, tf.matmul(X, self.J)], axis=2)
         Z_t_Z = tf.matmul(Z, Z, transpose_a=True)
 
         det = tf.linalg.det(Z_t_Z)
@@ -79,7 +77,7 @@ class ScalarOnFunctionModel(BaseModel):
     def compute_objective_bo(self, X, m, n):
         ones = np.ones((m, 1)).reshape(-1, 1)
         X = np.array(X).reshape(m, n)
-        Z = np.hstack((ones, X @ self.J_cb))
+        Z = np.hstack((ones, X @ self.J))
         try:
             M = np.linalg.inv(Z.T @ Z)
         except np.linalg.LinAlgError:
@@ -87,16 +85,8 @@ class ScalarOnFunctionModel(BaseModel):
         result = np.trace(M)
         return 1e10 if result < 0 else result
 
-    def compute_Jcb(self):
-        if self.Kx_family == 'step':
-            sys.path.append(os.path.abspath("../utilities"))
-            from utilities.J.matrix_calc import Jcb, calc_basis_matrix
-            return Jcb(*[calc_basis_matrix(x_basis=x, b_basis=b) for x, b in zip(self.Kx, self.Kb)])
-        if self.Kx_family == 'b-spline':
-            sys.path.append(os.path.abspath("../../utilities"))
-            from utilities.J.J_bsplines_poly import Jcb, calc_basis_matrix
-            return Jcb(*[calc_basis_matrix(x_basis=x, b_basis=b, k=self.k_degree, knots_num=self.knots_num)
-                         for x, b in zip(self.Kx, self.Kb)])
+    def compute_J(self):
+        return JMatrix(self.basis_pairs).compute()
 
     def get_Jcb(self):
-        return self.J_cb
+        return self.J
