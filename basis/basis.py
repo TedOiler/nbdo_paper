@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_design(design, basis_list, runs, t_detail=100, style='seaborn-v0_8', sub_x=2, sub_y=2):
+def plot_design(design, basis_list, runs, t_detail=100, style='seaborn-v0_8', sub_x=2, sub_y=2, colour="#f0de89", name=None, figsize=(15, 10)):
     def split_array_by_columns(arr, col_splits):
         arrays = []
         start_col = 0
@@ -22,7 +22,9 @@ def plot_design(design, basis_list, runs, t_detail=100, style='seaborn-v0_8', su
     y_values = np.array(y_values).reshape(runs, len(basis_list), t_detail)
 
     for i in range(y_values.shape[1]):  # i bases
-        fig, axes = plt.subplots(sub_x, sub_y)
+        # set figure size to be big
+
+        fig, axes = plt.subplots(sub_x, sub_y, figsize=figsize)
         axes = axes.flatten()
 
         # Calculate breakpoints for the current basis
@@ -43,14 +45,17 @@ def plot_design(design, basis_list, runs, t_detail=100, style='seaborn-v0_8', su
 
         for j in range(y_values.shape[0]):  # j runs
             axes[j].plot(t_values, y_values[j][i])
-            axes[j].plot(break_points, y_break_points[j], 'o')
+            axes[j].plot(break_points, y_break_points[j], 'o', color=colour, markersize=4)
             axes[j].set_title(f'Run {j + 1}')
             axes[j].set_xlabel('t')
             axes[j].grid(False)
-            axes[j].set_ylim(-1.2, 1.2)
+            axes[j].set_ylim(-1.3, 1.3)
         fig.suptitle(f'Functional Factor {i + 1} ', fontsize=16)
         plt.tight_layout()
+        if name is not None:
+            plt.savefig(f"{name}.png")
         plt.show()
+        plt.close()
 
 
 class Basis:

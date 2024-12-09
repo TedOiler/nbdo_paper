@@ -1,37 +1,37 @@
 from .base_model import BaseModel
+from J.jmatrix import JMatrix
 import numpy as np
-import os
-import sys
 from scipy.linalg import block_diag
 import tensorflow as tf
 
 
 class FunctionOnFunctionModel(BaseModel):
-    def __init__(self, Kx, Kb, Kx_family, Ky, Kb_family='polynomial', k_degree=None, Sigma_decay=0, J_cb=None):
-        self.Kx_family = Kx_family
-        self.Kx = Kx
-        self.Kb_family = Kb_family
-        self.Kb = Kb
-        self.Ky = Ky
-        self.k_degree = k_degree
-
-        self.knots_num = self.Kx[0] + 1
-        if J_cb is None:
-            self.J_CH = self.compute_Jcb()
-        else:
-            self.J_CH = J_cb
+    def __init__(self, bases_pairs=None, Sigma_decay=None, Kb_t=2, const=True):
+        self.basis_pairs = bases_pairs
         self.Sigma_decay = Sigma_decay
+        self.const = const
+        offset = 1 if self.const else 0
+        self.J = self.compute_J()
+        self.Kx = self.J.shape[0] - offset
+        self.Kb_s = self.J.shape[1] - offset
+        self.Kb = self.Kb_s  #  For consistency reasons need to make better (this is used in the check in cordex to check if the model is estimable)
+        self.Kb_t = Kb_t  # L in mathematics
+
         self.Sigma = self.compute_Sigma()
 
-        if J_cb is None:
-            self.J_cb = self.compute_Jcb()
+    def _prepare_Gamma(self, Gamma_, N):
+        if self.const:
+            ones = np.ones((N, 1))
+            Gamma = np.hstack((ones, Gamma_))
         else:
-            self.J_cb = J_cb
+            Gamma = Gamma_
+        return Gamma
 
     def compute_objective(self, Gamma_, N, Kx):
-        Gamma = np.hstack((np.ones((N, 1)), Gamma_))
-        Z = Gamma @ self.J_CH
+        Gamma = self._prepare_Gamma(Gamma_, N)
+        Z = Gamma @ self.J
         ZtZ_inv = np.linalg.inv(Z.T @ Z)
+        M = np.kron(ZtZ_inv, self.Sigma)
 
         # A-optimality: Trace of the covariance matrix
         value = np.trace(ZtZ_inv) * np.trace(self.Sigma)
@@ -42,77 +42,65 @@ class FunctionOnFunctionModel(BaseModel):
         Gamma_[i, j] = x
         return self.compute_objective(Gamma_, N, Kx)
 
-        def compute_objective_tf(self, Gamma_, N, Kx):
-            Gamma = tf.concat([tf.ones((N, 1)), Gamma_], axis=1)
-        Z = tf.matmul(Gamma, self.J_CH)
-        ZtZ = tf.matmul(Z, Z, transpose_a=True)
-
-        try:
-            ZtZ_inv = tf.linalg.inv(ZtZ)
-            value = tf.linalg.trace(ZtZ_inv) * tf.linalg.trace(self.Sigma)
-        except tf.errors.InvalidArgumentError:
-            return tf.constant(np.nan)
-
-        return tf.where(tf.math.is_finite(value), value, tf.constant(np.nan))
-
     def compute_objective_tf(self, Gamma_, N, Kx):
-        Gamma = tf.concat([tf.ones((N, 1)), Gamma_], axis=1)
-        Z = tf.matmul(Gamma, self.J_CH)
-        ZtZ = tf.matmul(Z, Z, transpose_a=True)
+        # Convert self.J and self.Sigma to TensorFlow tensors
+        J_tf = tf.convert_to_tensor(self.J, dtype=tf.float32)
+        Sigma_tf = tf.convert_to_tensor(self.Sigma, dtype=tf.float32)
 
-        try:
-            ZtZ_inv = tf.linalg.inv(ZtZ)
-            value = tf.linalg.trace(ZtZ_inv) * tf.linalg.trace(self.Sigma)
-        except tf.errors.InvalidArgumentError:
-            return tf.constant(np.nan)
+        # Reshape Gamma_ from (batch_size, N * Kx) to (batch_size, N, Kx)
+        batch_size = tf.shape(Gamma_)[0]
+        Gamma_reshaped = tf.reshape(Gamma_, [batch_size, N, Kx])
 
-        return tf.where(tf.math.is_finite(value), value, tf.constant(np.nan))
+        # Prepare Gamma
+        if self.const:
+            ones = tf.ones([batch_size, N, 1], dtype=tf.float32)
+            Gamma = tf.concat([ones, Gamma_reshaped], axis=2)  # Shape: (batch_size, N, Kx + 1)
+        else:
+            Gamma = Gamma_reshaped  # Shape: (batch_size, N, Kx)
+
+        # Expand J_tf to match batch dimensions
+        J_tf_expanded = tf.expand_dims(J_tf, axis=0)  # Shape: (1, Kx + offset, Kb_s)
+        J_tf_expanded = tf.tile(J_tf_expanded, [batch_size, 1, 1])  # Shape: (batch_size, Kx + offset, Kb_s)
+
+        # Compute Z for each design in the batch
+        Z = tf.matmul(Gamma, J_tf_expanded)  # Shape: (batch_size, N, Kb_s)
+
+        # Compute ZtZ for each design in the batch
+        ZtZ = tf.matmul(Z, Z, transpose_a=True)  # Shape: (batch_size, Kb_s, Kb_s)
+
+        # Compute the inverse and trace for each design
+        def compute_design_objective(ZtZ_single):
+            try:
+                ZtZ_inv = tf.linalg.inv(ZtZ_single)
+                value = tf.linalg.trace(ZtZ_inv) * tf.linalg.trace(Sigma_tf)
+            except tf.errors.InvalidArgumentError:
+                value = tf.constant(np.nan, dtype=tf.float32)
+            return value
+
+        # Map over the batch
+        values = tf.map_fn(compute_design_objective, ZtZ, dtype=tf.float32)
+
+        # Return the mean value over the batch
+        return tf.reduce_mean(values)
 
     def compute_objective_bo(self, Gamma_, N, Kx):
-        Gamma = np.hstack((np.ones((N, 1)), Gamma_))
-        Z = Gamma @ self.J_CH
+        Gamma_ = Gamma_.reshape((N, Kx))
+        value = self.compute_objective(Gamma_, N, Kx)
+        return 1e10 if np.isnan(value) or value < 0 else value
 
-        try:
-            ZtZ_inv = np.linalg.inv(Z.T @ Z)
-            value = np.trace(ZtZ_inv) * np.trace(self.Sigma)
-        except np.linalg.LinAlgError:
-            return 1e10
-
-        return 1e10 if value < 0 else value
-
-    def compute_Jcb(self):
-        if self.Kx_family == 'step':
-            sys.path.append(os.path.abspath("../utilities"))
-            from utilities.J.matrix_calc import Jcb, calc_basis_matrix
-            Jcb = Jcb(*[calc_basis_matrix(x_basis=x, b_basis=b) for x, b in zip(self.Kx, self.Kb)])
-            return block_diag(1, Jcb)
-        if self.Kx_family == 'b-spline':
-            sys.path.append(os.path.abspath("../utilities"))
-            from utilities.J.J_bsplines_poly import Jcb, calc_basis_matrix
-            Jcb = Jcb(*[calc_basis_matrix(x_basis=x, b_basis=b, k=self.k_degree, knots_num=self.knots_num)
-                        for x, b in zip(self.Kx, self.Kb)])
-            return block_diag(1, Jcb)
-
-    def get_Jcb(self):
-        return self.J_cb
+    def compute_J(self):
+        if self.const:
+            return block_diag(np.array([[1]]), JMatrix(self.basis_pairs).compute())
+        else:
+            return JMatrix(self.basis_pairs).compute()
 
     def compute_Sigma(self):
-        inputs = np.linspace(0, 1, self.Ky)
-
-        def exp_decay(dec_rate, x):
-            return np.exp(-dec_rate * x)
-
-        if self.Sigma_decay == 0:
-            Sigma = np.diag(exp_decay(self.Sigma_decay, inputs))
-            return Sigma
-        elif self.Sigma_decay == np.inf:
-            elements = np.zeros((len(self.Kx) + 1) * self.Ky)
+        inputs = np.linspace(0, 1, self.Kb_t)
+        if self.Sigma_decay == np.inf:
+            elements = np.zeros((self.Kx + 1) * self.Kb_t)
             Sigma = np.diag(elements)
             Sigma[0, 0] = 1
             return Sigma
         else:
-            Sigma = np.diag(exp_decay(self.Sigma_decay, inputs))
-            return Sigma
-
-    def get_Sigma(self):
-        return self.Sigma
+            decay = np.exp(-self.Sigma_decay * inputs)
+            return np.diag(decay)

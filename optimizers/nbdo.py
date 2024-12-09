@@ -139,7 +139,12 @@ class NBDO:
 
             return custom_loss
         elif isinstance(self.model, FunctionOnFunctionModel):
-            return None
+            def custom_loss(y_true, y_pred):
+                m = self.runs
+                n = self.model.Kx
+                objective_value = self.model.compute_objective_tf(y_pred, m, n)
+                return objective_value
+            return custom_loss
         elif isinstance(self.model, ScalarOnScalarModel):
             def custom_loss(y_true, y_pred):
                 reconstruction_loss = tf.keras.losses.MeanSquaredError()(y_true, y_pred)
@@ -164,22 +169,28 @@ class NBDO:
         try:
             size = model_matrix_columns(self.model.Kx[0], self.model.order)
         except:
-            size = 0
+            size = model_matrix_columns(self.model.Kx, 1)
 
-        for _ in range(num_designs*10):
+        for _ in range(int(num_designs*1e6)):
             if valid_count == num_designs:
                 break
 
             if isinstance(self.model, ScalarOnScalarModel):
                 candidate_matrix = np.random.uniform(-1, 1, size=(runs, size))
                 ZtZ = self.model.calc_covar_matrix(candidate_matrix)
-            else:
+            elif isinstance(self.model, ScalarOnFunctionModel):
                 candidate_matrix = np.random.uniform(-1, 1, size=(runs, self.model.Kx[0]))
                 Z = np.hstack((np.ones((runs, 1)), candidate_matrix @ self.model.J))
+                ZtZ = Z.T @ Z
+            elif isinstance(self.model, FunctionOnFunctionModel):
+                candidate_matrix = np.random.uniform(-1, 1, size=(runs, self.model.Kx))
+                Gamma = np.hstack((np.ones((runs, 1)), candidate_matrix))
+                Z = np.matmul(Gamma, self.model.J)
                 ZtZ = Z.T @ Z
             if np.linalg.det(ZtZ) > epsilon:
                 design_matrix.append(candidate_matrix)
                 valid_count += 1
+
         reshaped_design_matrix = np.stack(design_matrix).reshape(num_designs, -1)
         self.train_set, self.val_set = train_test_split(reshaped_design_matrix,
                                                         test_size=0.2,
@@ -211,7 +222,7 @@ class NBDO:
                 optimality = self.model.compute_objective_bo(X=decoded, m=self.runs, n=self.model.Kx[0])
                 return optimality
             elif self.model.__class__.__name__ == 'FunctionOnFunctionModel':
-                optimality = self.model.compute_objective_bo(X=decoded, m=self.runs, n=self.model.Kx[0])
+                optimality = self.model.compute_objective_bo(decoded, self.runs, self.model.Kx)
                 return optimality
             elif self.model.__class__.__name__ == 'ScalarOnScalarModel':
                 optimality = self.model.compute_objective_bo(X=decoded, m=self.runs, n=self.model.Kx[0])

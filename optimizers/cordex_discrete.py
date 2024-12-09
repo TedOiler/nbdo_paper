@@ -2,7 +2,7 @@ from .base_optimizer import BaseOptimizer
 import numpy as np
 import sys
 from pathlib import Path
-from utilities.help.gen_rand_design import gen_rand_design_m
+from utilities.help.gen_rand_design import gen_rand_design
 from mathematical_models.f_on_f import FunctionOnFunctionModel
 from mathematical_models.s_on_f import ScalarOnFunctionModel
 from mathematical_models.s_on_s import ScalarOnScalarModel
@@ -24,7 +24,7 @@ class CordexDiscrete(BaseOptimizer):
         best_design, best_optimality_value = None, np.inf
 
         for _ in tqdm(range(epochs)):
-            Gamma = gen_rand_design_m(runs=self.runs, f_list=self.model.Kx)
+            Gamma = gen_rand_design(N=self.runs, P=self.model.Kx)
             best_design, best_optimality_value = self._cordex_loop(
                 Gamma, best_optimality_value, best_design)
 

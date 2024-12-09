@@ -1,8 +1,5 @@
 from .base_model import BaseModel
 from J.jmatrix import JMatrix
-from basis.bspline import BSplineBasis
-from basis.polynomial import PolynomialBasis
-from basis.fourier import FourierBasis
 import numpy as np
 import tensorflow as tf
 
@@ -87,6 +84,3 @@ class ScalarOnFunctionModel(BaseModel):
 
     def compute_J(self):
         return JMatrix(self.basis_pairs).compute()
-
-    def get_Jcb(self):
-        return self.J

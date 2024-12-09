@@ -26,6 +26,11 @@ class CordexContinuous(BaseOptimizer):
             raise ValueError(f"Model not estimable with {self.runs} runs and {self.model.Kb} parameters."
                              f" Need at least {self.model.Kb + 1} runs.")
 
+        if self.model.J.shape[0] < self.model.J.shape[1]:
+            raise ValueError(f"Model not estimable with {self.model.J.shape[0]} basis for X "
+                             f"and {self.model.J.shape[1]} basis for beta."
+                             f"The J matrix needs to be thin.")
+
         best_Gamma, best_optimality_value = None, np.inf
 
         for _ in tqdm(range(epochs)):
