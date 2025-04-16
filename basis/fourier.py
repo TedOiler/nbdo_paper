@@ -11,10 +11,10 @@ class FourierBasis(Basis):
             return 1.0  # Constant term
         elif i % 2 == 1:
             n = (i + 1) // 2
-            return np.sin(2 * np.pi * n * t)
+            return np.sqrt(2) * np.sin(2 * np.pi * n * t)
         else:
             n = i // 2
-            return np.cos(2 * np.pi * n * t)
+            return np.sqrt(2) * np.cos(2 * np.pi * n * t)
 
     def get_basis_support(self, i):
         return 0.0, 1.0
