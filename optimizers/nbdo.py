@@ -134,7 +134,7 @@ class NBDO:
             def custom_loss(y_true, y_pred):
                 reconstruction_loss = tf.keras.losses.MeanSquaredError()(y_true, y_pred)
                 m = self.runs
-                n = self.model.Kx[0]
+                n = self.model.Kx
                 objective_value = self.model.compute_objective_tf(y_pred, m, n)
                 return objective_value
 
@@ -168,7 +168,7 @@ class NBDO:
         if isinstance(self.model, ScalarOnScalarModel):
             n_features = self.model.Kx[0]
         elif isinstance(self.model, ScalarOnFunctionModel):
-            n_features = self.model.Kx[0]
+            n_features = self.model.Kx
         elif isinstance(self.model, FunctionOnFunctionModel):
             n_features = self.model.Kx
         else:
@@ -205,7 +205,7 @@ class NBDO:
                     continue
 
                 # Accept design if well-conditioned or if explicitly ScalarOnScalar (always accepted)
-                if np.linalg.det(ZtZ) > epsilon or isinstance(self.model, ScalarOnScalarModel):
+                if np.linalg.det(ZtZ) > epsilon or isinstance(self.model, ScalarOnScalarModel) or isinstance(self.model, ScalarOnFunctionModel):
                     design_matrix.append(candidate_matrix)
                     valid_count += 1
 
@@ -245,7 +245,7 @@ class NBDO:
             latent_var = np.array(latent_var).reshape(1, -1)
             decoded = self.decoder.predict(latent_var)
             if self.model.__class__.__name__ == 'ScalarOnFunctionModel':
-                optimality = self.model.compute_objective_bo(X=decoded, m=self.runs, n=self.model.Kx[0])
+                optimality = self.model.compute_objective_bo(X=decoded, m=self.runs, n=self.model.Kx)
                 return optimality
             elif self.model.__class__.__name__ == 'FunctionOnFunctionModel':
                 optimality = self.model.compute_objective_bo(decoded, self.runs, self.model.Kx)

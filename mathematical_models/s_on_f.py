@@ -22,16 +22,16 @@ class ScalarOnFunctionModel(BaseModel):
                 f"Kx_family='{self.Kx_family}', Kb_family='{self.Kb_family}', "
                 f"k_degree={self.k_degree}, knots_num={self.knots_num})")
 
-    def Covar(self, Gamma, library):
+    def Covar(self, X, m, library='numpy'):
         if library == 'numpy':
-            ones = np.ones((Gamma.shape[0], 1))
-            Zetta = np.concatenate((ones, Gamma @ self.J), axis=1)
+            ones = np.ones((X.shape[0], 1))
+            Zetta = np.concatenate((ones, X @ self.J), axis=1)
             Covar = Zetta.T @ Zetta
             return Covar
         elif library == 'tensorflow':
-            batch_size = tf.shape(Model_mat)[0]
-            ones = tf.ones((batch_size, f_coeffs, 1))
-            X = tf.reshape(Model_mat, (-1, f_coeffs, n))
+            batch_size = tf.shape(X)[0]
+            ones = tf.ones((batch_size, m, 1))
+            X = tf.reshape(X, (-1, m, self.Kx))
             Z = tf.concat([ones, tf.matmul(X, self.J)], axis=2)
             Covar = tf.matmul(Z, Z, transpose_a=True)
             return Covar
