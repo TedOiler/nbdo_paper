@@ -47,16 +47,38 @@ class ScalarOnScalarModel(BaseModel):
         Model_mat[i, j] = x
         return self.compute_objective(Model_mat)
 
-# ---------------------------------------- Tensorflow ----------------------------------------
+    # ---------------------------------------- Tensorflow ----------------------------------------
 
     def compute_objective_tf(self, X, m, n):
         batch_size = tf.shape(X)[0]
-        ones = tf.ones((batch_size, m, 1))
-        X = tf.reshape(X, (-1, m, n))
-        print(X)
-        Z = tf.concat([ones, tf.matmul(X, self.J_cb)], axis=2)
+        X = tf.reshape(X, (-1, m, n))  # shape: (batch_size, m, n)
 
-        Z_t_Z = tf.matmul(Z, Z, transpose_a=True)
+        def build_model_matrix(X_single):
+            # X_single shape: (m, n)
+            Z = tf.ones((m, 1), dtype=X_single.dtype)
+            if self.order >= 1:
+                Z = tf.concat([Z, X_single], axis=1)
+
+            if self.order >= 2:
+                # Square terms
+                squares = tf.square(X_single)
+                Z = tf.concat([Z, squares], axis=1)
+
+                # Interaction terms
+                inter_terms = []
+                for i in range(n):
+                    for j in range(i + 1, n):
+                        inter = X_single[:, i] * X_single[:, j]
+                        inter_terms.append(tf.expand_dims(inter, axis=1))
+                if inter_terms:
+                    Z = tf.concat([Z] + inter_terms, axis=1)
+            return Z
+
+        model_matrices = tf.map_fn(build_model_matrix, X)  # shape: (batch_size, m, num_features_model_matrix)
+
+        Z_t_Z = tf.matmul(model_matrices, model_matrices,
+                          transpose_a=True)  # shape: (batch_size, num_features, num_features)
+
         det = tf.linalg.det(Z_t_Z)
         epsilon = 1e-6
         condition = tf.abs(det)[:, None, None] < epsilon
@@ -67,18 +89,18 @@ class ScalarOnScalarModel(BaseModel):
 
         M = tf.linalg.inv(Z_t_Z_regularized)
         value = tf.linalg.trace(M)
-        return tf.where(value < 0, tf.constant(1e10), value)
+        return tf.where(value < 0, tf.constant(1e10, dtype=value.dtype), value)
 
     def compute_objective_bo(self, X, m, n):
-        ones = np.ones((m, 1)).reshape(-1, 1)
-        X = np.array(X).reshape(m, n)
-        Z = np.hstack((ones, X @ self.J_cb))
         try:
-            M = np.linalg.inv(Z.T @ Z)
+            X = np.array(X).reshape(m, -1)  # infer the correct number of columns
+            model_mat = self.calc_model_matrix(X)
+            ZtZ = model_mat.T @ model_mat
+            M = np.linalg.inv(ZtZ)
+            result = np.trace(M)
+            return 1e10 if result < 0 else result
         except np.linalg.LinAlgError:
             return 1e10
-        result = np.trace(M)
-        return 1e10 if result < 0 else result
 
     def compute_Jcb(self):
         return np.eye(self.Kx[0])

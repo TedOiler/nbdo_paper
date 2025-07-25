@@ -7,6 +7,7 @@ from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras.backend import clear_session
 import gc
+from scipy.stats import qmc
 
 from skopt import gp_minimize
 from sklearn.model_selection import train_test_split
@@ -154,48 +155,73 @@ class NBDO:
                 return objective_value
             return custom_loss
 
-    def compute_train_set(self, num_designs,
-                          runs, epsilon=1e-10):
-
+    def compute_train_set(self, num_designs, runs, epsilon=1e-10, type='random'):
         def model_matrix_columns(n, p):
             from math import comb
-            if p == 0:
-                return n
             return comb(n + p, p)
 
         self.runs = runs
         design_matrix = []
         valid_count = 0
-        try:
-            size = model_matrix_columns(self.model.Kx[0], self.model.order)
-        except:
-            size = model_matrix_columns(self.model.Kx, 1)
 
-        for _ in range(int(num_designs*1e6)):
+        # Determine number of raw input features (NOT the number of model matrix terms)
+        if isinstance(self.model, ScalarOnScalarModel):
+            n_features = self.model.Kx[0]
+        elif isinstance(self.model, ScalarOnFunctionModel):
+            n_features = self.model.Kx[0]
+        elif isinstance(self.model, FunctionOnFunctionModel):
+            n_features = self.model.Kx
+        else:
+            raise ValueError("Unsupported model type.")
+
+        max_attempts = int(1e6)
+
+        for attempt in range(max_attempts):
             if valid_count == num_designs:
                 break
 
-            if isinstance(self.model, ScalarOnScalarModel):
-                candidate_matrix = np.random.uniform(-1, 1, size=(runs, size))
-                ZtZ = self.model.calc_covar_matrix(candidate_matrix)
-            elif isinstance(self.model, ScalarOnFunctionModel):
-                candidate_matrix = np.random.uniform(-1, 1, size=(runs, self.model.Kx[0]))
-                Z = np.hstack((np.ones((runs, 1)), candidate_matrix @ self.model.J))
-                ZtZ = Z.T @ Z
-            elif isinstance(self.model, FunctionOnFunctionModel):
-                candidate_matrix = np.random.uniform(-1, 1, size=(runs, self.model.Kx))
-                Gamma = np.hstack((np.ones((runs, 1)), candidate_matrix))
-                Z = np.matmul(Gamma, self.model.J)
-                ZtZ = Z.T @ Z
-            if np.linalg.det(ZtZ) > epsilon:
-                design_matrix.append(candidate_matrix)
-                valid_count += 1
+            # Generate candidate design of shape (runs, n_features)
+            if type == 'random':
+                candidate_matrix = np.random.uniform(-1, 1, size=(runs, n_features))
+            elif type == 'LHC':
+                sampler = qmc.LatinHypercube(d=n_features)
+                lhs_sample = sampler.random(n=runs)
+                candidate_matrix = 2 * lhs_sample - 1  # scale to [-1, 1]
+            else:
+                raise ValueError("type must be 'random' or 'LHC'")
 
+            # Compute information matrix for validation
+            try:
+                if isinstance(self.model, ScalarOnScalarModel):
+                    ZtZ = self.model.calc_covar_matrix(candidate_matrix)
+                elif isinstance(self.model, ScalarOnFunctionModel):
+                    Z = np.hstack((np.ones((runs, 1)), candidate_matrix @ self.model.J))
+                    ZtZ = Z.T @ Z
+                elif isinstance(self.model, FunctionOnFunctionModel):
+                    Gamma = np.hstack((np.ones((runs, 1)), candidate_matrix))
+                    Z = np.matmul(Gamma, self.model.J)
+                    ZtZ = Z.T @ Z
+                else:
+                    continue
+
+                # Accept design if well-conditioned or if explicitly ScalarOnScalar (always accepted)
+                if np.linalg.det(ZtZ) > epsilon or isinstance(self.model, ScalarOnScalarModel):
+                    design_matrix.append(candidate_matrix)
+                    valid_count += 1
+
+            except np.linalg.LinAlgError:
+                continue
+
+        if valid_count < num_designs:
+            raise RuntimeError(f"Only found {valid_count} valid designs after {max_attempts} attempts.")
+
+        # Stack and flatten: (num_designs, runs * n_features)
         reshaped_design_matrix = np.stack(design_matrix).reshape(num_designs, -1)
         self.train_set, self.val_set = train_test_split(reshaped_design_matrix,
                                                         test_size=0.2,
                                                         random_state=42)
         self.input_dim = self.train_set.shape[1]
+
 
     def fit(self, epochs, batch_size=32,
             patience=50, optimizer=tf.keras.optimizers.legacy.RMSprop()):
