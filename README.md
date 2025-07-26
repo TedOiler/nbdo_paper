@@ -41,31 +41,31 @@ pip install -r requirements.txt
 
 ```
 system_optidex/
-├── basis/                 # Basis function implementations
-│   ├── bspline.py        # B-spline basis functions
-│   ├── fourier.py        # Fourier basis functions
-│   ├── polynomial.py     # Polynomial basis functions
-│   └── basis.py          # Base class and utilities
-├── mathematical_models/   # Mathematical model implementations
-│   ├── base_model.py     # Abstract base class
-│   ├── s_on_s.py         # Scalar-on-Scalar models
-│   ├── s_on_f.py         # Scalar-on-Function models
-│   └── f_on_f.py         # Function-on-Function models
-├── optimizers/           # Optimization algorithms
-│   ├── base_optimizer.py # Abstract base class
-│   ├── cordex_continuous.py # Continuous coordinate descent
-│   ├── cordex_discrete.py   # Discrete coordinate descent
-│   └── nbdo.py           # Neural Bayesian Design Optimization
-├── J/                    # J-matrix computations
-│   └── jmatrix.py        # Integration matrix calculations
-├── utilities/            # Helper functions and utilities
-│   ├── plotting/         # Visualization tools
-│   ├── criteria/         # Optimality criteria
-│   └── help/            # Utility functions
-├── playground/           # Example notebooks and scripts
-│   ├── ae/              # Autoencoder examples
-│   └── cordex/          # Cordex optimization examples
-└── results/             # Output files and plots
+├── basis/                   # Basis function implementations
+│   ├── bspline.py              # B-spline basis functions
+│   ├── fourier.py              # Fourier basis functions
+│   ├── polynomial.py           # Polynomial basis functions
+│   └── basis.py                # Base class and utilities
+├── mathematical_models/     # Mathematical model implementations
+│   ├── base_model.py           # Abstract base class
+│   ├── s_on_s.py               # Scalar-on-Scalar models
+│   ├── s_on_f.py               # Scalar-on-Function models
+│   └── f_on_f.py               # Function-on-Function models
+├── optimizers/              # Optimization algorithms
+│   ├── base_optimizer.py       # Abstract base class
+│   ├── cordex_continuous.py    # Continuous coordinate descent
+│   ├── cordex_discrete.py      # Discrete coordinate descent
+│   └── nbdo.py                 # Neural Bayesian Design Optimization
+├── J/                       # J-matrix computations
+│   └── jmatrix.py              # Integration matrix calculations
+├── utilities/               # Helper functions and utilities
+│   ├── plotting/               # Visualization tools
+│   ├── criteria/               # Optimality criteria
+│   └── help/                   # Utility functions
+├── playground/              # Example notebooks and scripts
+│   ├── ae/                     # Autoencoder examples
+│   └── cordex/                 # Cordex optimization examples
+└── results/                 # Output files and plots
 ```
 
 ## Quick Start
@@ -189,10 +189,10 @@ If you use this framework in your research, please cite:
 
 ```bibtex
 @software{system_optidex,
-  title={System Optidex: Optimal Experimental Design Framework},
-  author={Your Name},
+  title={NBDO: NeuroBayes Design Optimizer},
+  author={Tedoiler},
   year={2024},
-  url={https://github.com/yourusername/system_optidex}
+  url={https://github.com/yourusername/nbdo_paper}
 }
 ```
 
